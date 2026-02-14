@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Puntos{% endblock %}
+{% block content %}
+<div class="page-shell reveal">
+    <section class="section-card p-3">
+        <h1 class="h3 mb-3">Resumen de Puntos</h1>
+        <div class="row g-3 mb-4">
+            <div class="col-md-4"><div class="kpi-card p-3"><strong>Acumulados:</strong> {{ total_points }}</div></div>
+            <div class="col-md-4"><div class="kpi-card p-3"><strong>Canjeados:</strong> {{ points_spent }}</div></div>
+            <div class="col-md-4"><div class="kpi-card p-3"><strong>Balance:</strong> {{ balance }}</div></div>
+        </div>
+        <h2 class="h5">Movimientos</h2>
+        <div class="table-responsive">
+            <table class="table table-modern table-hover mb-0">
+                <thead><tr><th>Venta</th><th>Puntos</th><th>Fecha</th></tr></thead>
+                <tbody>
+                {% for p in points %}
+                    <tr><td>#{{ p.sale_id }}</td><td>{{ p.points }}</td><td>{{ p.created_at }}</td></tr>
+                {% empty %}
+                    <tr><td colspan="3" class="text-center text-muted py-4">Sin puntos todavía.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

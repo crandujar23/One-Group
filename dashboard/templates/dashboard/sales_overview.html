@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}Sales Overview{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Sales Command Center</h1>
+    {% if sales_rep %}
+    <p class="mb-0 opacity-75">Rep: {{ sales_rep.user.username }} | Tier: {{ sales_rep.tier|default:'N/A' }}</p>
+    {% else %}
+    <p class="mb-0 opacity-75">Visión consolidada de desempeño comercial.</p>
+    {% endif %}
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 reveal reveal-delay-1">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Total Ventas</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-2">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Confirmadas</p>
+            <p class="kpi-value kpi-accent-violet" data-count="{{ confirmed_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-3">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Puntos</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_points|default:0|floatformat:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Puntos Gastados</p>
+            <p class="kpi-value kpi-accent-violet" data-count="{{ points_spent|default:0|floatformat:0 }}">0</p>
+        </article>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5 reveal reveal-delay-1">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Distribución por estado</h2>
+            <canvas data-chart="donut" data-source="sales-status-data" width="360" height="240"></canvas>
+            <div class="chart-legend">
+                {% for item in sales_status_chart %}
+                <span><i style="background: {{ item.color }};"></i>{{ item.label }} ({{ item.value }})</span>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-7 reveal reveal-delay-2">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Ventas últimos 7 días</h2>
+            <canvas data-chart="bars" data-source="sales-daily-data" width="540" height="240"></canvas>
+        </section>
+    </div>
+</div>
+
+<section class="section-card p-3 reveal reveal-delay-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Ventas recientes</h2>
+        <span class="text-muted small">Monto acumulado: ${{ total_amount }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-modern table-hover mb-0">
+            <thead><tr><th>ID</th><th>Producto</th><th>Plan</th><th>Estado</th><th>Monto</th></tr></thead>
+            <tbody>
+            {% for sale in recent_sales %}
+                <tr>
+                    <td><a href="{% url 'dashboard:sales_detail' sale.id %}">#{{ sale.id }}</a></td>
+                    <td>{{ sale.product.name }}</td>
+                    <td>{{ sale.plan.name }}</td>
+                    <td>
+                        {% if sale.status == "CONFIRMED" %}
+                            <span class="status-pill status-confirmed">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "PENDING" %}
+                            <span class="status-pill status-pending">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "CANCELLED" %}
+                            <span class="status-pill status-cancelled">{{ sale.get_status_display }}</span>
+                        {% else %}
+                            <span class="status-pill status-default">{{ sale.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>${{ sale.amount }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Sin ventas registradas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{{ sales_status_chart|json_script:"sales-status-data" }}
+{{ daily_sales_chart|json_script:"sales-daily-data" }}
+{% endblock %}

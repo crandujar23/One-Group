@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}{{ unit_label }}{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">{{ unit_label }}</h1>
+    <p class="mb-0 opacity-75">Unidad de negocio: {{ business_unit.name }} ({{ business_unit.code }})</p>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4 reveal reveal-delay-1">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Total Ventas</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-4 reveal reveal-delay-2">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Confirmadas</p>
+            <p class="kpi-value kpi-accent-violet" data-count="{{ confirmed_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-4 reveal reveal-delay-3">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Monto Total</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_amount|default:0|floatformat:0 }}" data-currency="1">$0</p>
+        </article>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5 reveal reveal-delay-1">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Distribución por estado</h2>
+            <canvas data-chart="donut" data-source="unit-status-data" width="360" height="240"></canvas>
+            <div class="chart-legend">
+                {% for item in sales_status_chart %}
+                <span><i style="background: {{ item.color }};"></i>{{ item.label }} ({{ item.value }})</span>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-7 reveal reveal-delay-2">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Ventas últimos 7 días</h2>
+            <canvas data-chart="bars" data-source="unit-daily-data" width="540" height="240"></canvas>
+        </section>
+    </div>
+</div>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <h2 class="h5 mb-3">Ventas recientes</h2>
+    <div class="table-responsive">
+        <table class="table table-modern table-hover mb-0">
+            <thead><tr><th>ID</th><th>Rep</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
+            <tbody>
+            {% for sale in recent_sales %}
+                <tr>
+                    <td><a href="{% url 'dashboard:sales_detail' sale.id %}">#{{ sale.id }}</a></td>
+                    <td>{{ sale.sales_rep.user.username }}</td>
+                    <td>{{ sale.product.name }}</td>
+                    <td>
+                        {% if sale.status == "CONFIRMED" %}
+                            <span class="status-pill status-confirmed">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "PENDING" %}
+                            <span class="status-pill status-pending">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "CANCELLED" %}
+                            <span class="status-pill status-cancelled">{{ sale.get_status_display }}</span>
+                        {% else %}
+                            <span class="status-pill status-default">{{ sale.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>${{ sale.amount }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Sin ventas en esta unidad.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{{ sales_status_chart|json_script:"unit-status-data" }}
+{{ daily_sales_chart|json_script:"unit-daily-data" }}
+{% endblock %}

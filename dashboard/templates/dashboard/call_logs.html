@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Call Logs{% endblock %}
+{% block content %}
+<div class="page-shell reveal">
+    <section class="section-card p-3">
+        <div class="d-flex justify-content-between mb-3">
+            <h1 class="h3 mb-0">Call Logs</h1>
+            {% if is_sales_rep_user %}
+            <a href="{% url 'dashboard:call_log_create' %}" class="btn btn-primary">Nuevo log</a>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-modern table-hover">
+                <thead><tr><th>Rep</th><th>Tipo</th><th>Asunto</th><th>Venta</th><th>Fecha</th></tr></thead>
+                <tbody>
+                {% for log in call_logs %}
+                    <tr>
+                        <td>{{ log.sales_rep.user.username }}</td>
+                        <td>{{ log.get_contact_type_display }}</td>
+                        <td>{{ log.subject }}</td>
+                        <td>{{ log.sale_id|default:'-' }}</td>
+                        <td>{{ log.logged_at }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">Sin registros.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Paginacion call logs">
+          <ul class="pagination mb-0">
+            {% if page_obj.has_previous %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a></li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

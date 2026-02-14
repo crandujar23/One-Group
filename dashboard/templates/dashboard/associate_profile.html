@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex flex-column flex-md-row align-items-md-center gap-3">
+        <div>
+            {% if sales_rep and sales_rep.avatar %}
+            <img src="{{ sales_rep.avatar.url }}" alt="Avatar del asociado" class="associate-avatar">
+            {% else %}
+            <div class="associate-avatar associate-avatar-placeholder">
+                {{ request.user.username|slice:":1"|upper }}
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <h1 class="h3 mb-2">Perfil del Asociado</h1>
+            <p class="mb-0 opacity-75">
+                {{ request.user.get_full_name|default:request.user.username }}
+                {% if sales_rep %}
+                    {% if sales_rep.tier %}| Tier: {{ sales_rep.tier.name }}{% endif %}
+                    | Unidad: {{ sales_rep.business_unit.name }}
+                {% else %}
+                    | Perfil administrativo
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 reveal reveal-delay-1">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Ventas</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-2">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Confirmadas</p>
+            <p class="kpi-value kpi-accent-violet" data-count="{{ confirmed_sales|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-3">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Comisiones</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_commission|default:0|floatformat:0 }}" data-currency="1">$0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Bonos</p>
+            <p class="kpi-value kpi-accent-violet" data-count="{{ total_bonus|default:0|floatformat:0 }}" data-currency="1">$0</p>
+        </article>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-7 reveal reveal-delay-1">
+        <section class="section-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Datos del Perfil</h2>
+                <span class="text-muted small">Actualiza tu información profesional</span>
+            </div>
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="active_tab" id="active_tab_input" value="{{ active_tab|default:'pane-personal' }}">
+                <ul class="nav nav-tabs mb-3" id="associate-profile-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if active_tab == 'pane-personal' %}active{% endif %}" id="tab-personal" data-bs-toggle="tab" data-bs-target="#pane-personal" type="button" role="tab" aria-controls="pane-personal" aria-selected="{% if active_tab == 'pane-personal' %}true{% else %}false{% endif %}">Personal</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if active_tab == 'pane-addresses' %}active{% endif %}" id="tab-addresses" data-bs-toggle="tab" data-bs-target="#pane-addresses" type="button" role="tab" aria-controls="pane-addresses" aria-selected="{% if active_tab == 'pane-addresses' %}true{% else %}false{% endif %}">Direcciones</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if active_tab == 'pane-work' %}active{% endif %}" id="tab-work" data-bs-toggle="tab" data-bs-target="#pane-work" type="button" role="tab" aria-controls="pane-work" aria-selected="{% if active_tab == 'pane-work' %}true{% else %}false{% endif %}">Laboral</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="associate-profile-tabs-content">
+                    <div class="tab-pane fade {% if active_tab == 'pane-personal' %}show active{% endif %}" id="pane-personal" role="tabpanel" aria-labelledby="tab-personal" tabindex="0">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                {{ user_form.first_name }}
+                                {% for err in user_form.first_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Primer apellido*</label>
+                                {{ user_form.last_name }}
+                                {% for err in user_form.last_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Segundo apellido</label>
+                                {% if associate_form %}
+                                    {{ associate_form.second_last_name }}
+                                    {% for err in associate_form.second_last_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                {% else %}
+                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                {{ user_form.email }}
+                                {% for err in user_form.email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono</label>
+                                {% if associate_form %}
+                                    {{ associate_form.phone }}
+                                    {% for err in associate_form.phone.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                {% else %}
+                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade {% if active_tab == 'pane-addresses' %}show active{% endif %}" id="pane-addresses" role="tabpanel" aria-labelledby="tab-addresses" tabindex="0">
+                        {% if associate_form %}
+                        <section class="address-card mb-3 p-3">
+                            <h3 class="h6 mb-3">Dirección Postal</h3>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Dirección*</label>
+                                    {{ associate_form.postal_address_line_1 }}
+                                    {% for err in associate_form.postal_address_line_1.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Dirección 2</label>
+                                    {{ associate_form.postal_address_line_2 }}
+                                    {% for err in associate_form.postal_address_line_2.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Ciudad*</label>
+                                    {{ associate_form.postal_city }}
+                                    {% for err in associate_form.postal_city.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Estado*</label>
+                                    {{ associate_form.postal_state }}
+                                    {% for err in associate_form.postal_state.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Código Postal*</label>
+                                    {{ associate_form.postal_zip_code }}
+                                    {% for err in associate_form.postal_zip_code.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="address-card p-3">
+                            <h3 class="h6 mb-3">Dirección Física</h3>
+                            <div class="form-check mb-3">
+                                {{ associate_form.physical_same_as_postal }}
+                                <label class="form-check-label" for="{{ associate_form.physical_same_as_postal.id_for_label }}">
+                                    Dirección física es la misma que la postal
+                                </label>
+                                {% for err in associate_form.physical_same_as_postal.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                            </div>
+                            <div class="row g-3" id="physical-address-fields">
+                                <div class="col-md-6">
+                                    <label class="form-label">Dirección Física*</label>
+                                    {{ associate_form.physical_address_line_1 }}
+                                    {% for err in associate_form.physical_address_line_1.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Dirección Física 2</label>
+                                    {{ associate_form.physical_address_line_2 }}
+                                    {% for err in associate_form.physical_address_line_2.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Ciudad Física*</label>
+                                    {{ associate_form.physical_city }}
+                                    {% for err in associate_form.physical_city.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Estado Físico*</label>
+                                    {{ associate_form.physical_state }}
+                                    {% for err in associate_form.physical_state.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Código Postal Físico*</label>
+                                    {{ associate_form.physical_zip_code }}
+                                    {% for err in associate_form.physical_zip_code.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                </div>
+                            </div>
+                        </section>
+                        {% else %}
+                        <input type="text" class="form-control" disabled value="No aplica para este perfil">
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade {% if active_tab == 'pane-work' %}show active{% endif %}" id="pane-work" role="tabpanel" aria-labelledby="tab-work" tabindex="0">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de ingreso</label>
+                                {% if associate_form %}
+                                    {{ associate_form.hire_date }}
+                                    {% for err in associate_form.hire_date.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                {% else %}
+                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Foto / Avatar</label>
+                                {% if associate_form %}
+                                    {{ associate_form.avatar }}
+                                    {% for err in associate_form.avatar.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                    <div class="form-text">Formatos: JPG, PNG, WEBP. Máximo 2MB.</div>
+                                {% else %}
+                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-primary" type="submit">Guardar cambios</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div class="col-lg-5 reveal reveal-delay-2">
+        <section class="section-card p-4 h-100">
+            <h2 class="h5 mb-3">Resumen Financiero y Rewards</h2>
+            <ul class="list-group mb-3">
+                <li class="list-group-item d-flex justify-content-between"><span>Ventas Totales</span><strong>${{ total_revenue }}</strong></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Comisiones</span><strong>${{ total_commission }}</strong></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Bonos</span><strong>${{ total_bonus }}</strong></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Puntos acumulados</span><strong>{{ total_points }}</strong></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Puntos canjeados</span><strong>{{ points_spent }}</strong></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Balance de puntos</span><strong>{{ points_balance }}</strong></li>
+            </ul>
+            <p class="text-muted small mb-0">Este perfil refleja tus métricas reales y se actualiza automáticamente con cada venta confirmada.</p>
+        </section>
+    </div>
+</div>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <h2 class="h5 mb-3">Actividad reciente</h2>
+    <div class="table-responsive">
+        <table class="table table-modern table-hover mb-0">
+            <thead><tr><th>ID</th><th>Producto</th><th>Plan</th><th>Estado</th><th>Monto</th></tr></thead>
+            <tbody>
+            {% for sale in recent_sales %}
+                <tr>
+                    <td><a href="{% url 'dashboard:sales_detail' sale.id %}">#{{ sale.id }}</a></td>
+                    <td>{{ sale.product.name }}</td>
+                    <td>{{ sale.plan.name }}</td>
+                    <td>
+                        {% if sale.status == "CONFIRMED" %}
+                            <span class="status-pill status-confirmed">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "PENDING" %}
+                            <span class="status-pill status-pending">{{ sale.get_status_display }}</span>
+                        {% elif sale.status == "CANCELLED" %}
+                            <span class="status-pill status-cancelled">{{ sale.get_status_display }}</span>
+                        {% else %}
+                            <span class="status-pill status-default">{{ sale.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>${{ sale.amount }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Sin actividad reciente.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+<script>
+(function () {
+    const tabButtons = document.querySelectorAll('#associate-profile-tabs button[data-bs-toggle="tab"]');
+    const activeTabInput = document.getElementById('active_tab_input');
+    tabButtons.forEach((button) => {
+        button.addEventListener('shown.bs.tab', function (event) {
+            const target = event.target.getAttribute('data-bs-target');
+            if (target && activeTabInput) {
+                activeTabInput.value = target.replace('#', '');
+            }
+        });
+    });
+})();
+</script>
+{% if associate_form %}
+<script>
+(function () {
+    const sameAsPostalCheckbox = document.getElementById('{{ associate_form.physical_same_as_postal.id_for_label }}');
+    const physicalFields = [
+        ['{{ associate_form.postal_address_line_1.id_for_label }}', '{{ associate_form.physical_address_line_1.id_for_label }}'],
+        ['{{ associate_form.postal_address_line_2.id_for_label }}', '{{ associate_form.physical_address_line_2.id_for_label }}'],
+        ['{{ associate_form.postal_city.id_for_label }}', '{{ associate_form.physical_city.id_for_label }}'],
+        ['{{ associate_form.postal_state.id_for_label }}', '{{ associate_form.physical_state.id_for_label }}'],
+        ['{{ associate_form.postal_zip_code.id_for_label }}', '{{ associate_form.physical_zip_code.id_for_label }}'],
+    ];
+
+    function syncPhysicalFromPostal() {
+        physicalFields.forEach(([postalId, physicalId]) => {
+            const postalInput = document.getElementById(postalId);
+            const physicalInput = document.getElementById(physicalId);
+            if (!postalInput || !physicalInput) return;
+            physicalInput.value = postalInput.value;
+        });
+    }
+
+    function togglePhysicalFields() {
+        if (!sameAsPostalCheckbox) return;
+        const checked = sameAsPostalCheckbox.checked;
+        physicalFields.forEach(([_, physicalId]) => {
+            const input = document.getElementById(physicalId);
+            if (!input) return;
+            input.readOnly = checked;
+            input.classList.toggle('is-readonly', checked);
+        });
+        if (checked) {
+            syncPhysicalFromPostal();
+        }
+    }
+
+    if (sameAsPostalCheckbox) {
+        sameAsPostalCheckbox.addEventListener('change', togglePhysicalFields);
+        physicalFields.forEach(([postalId]) => {
+            const postalInput = document.getElementById(postalId);
+            if (postalInput) {
+                postalInput.addEventListener('input', function () {
+                    if (sameAsPostalCheckbox.checked) syncPhysicalFromPostal();
+                });
+                postalInput.addEventListener('change', function () {
+                    if (sameAsPostalCheckbox.checked) syncPhysicalFromPostal();
+                });
+            }
+        });
+        togglePhysicalFields();
+    }
+})();
+</script>
+<script>
+(function () {
+    const phoneInput = document.getElementById('{{ associate_form.phone.id_for_label }}');
+    if (!phoneInput) return;
+
+    function digitCountBeforeCursor(value, cursorPos) {
+        return (value.slice(0, cursorPos).match(/\d/g) || []).length;
+    }
+
+    function caretPosForDigitIndex(formattedValue, digitIndex) {
+        if (digitIndex <= 0) return 0;
+        let seenDigits = 0;
+        for (let i = 0; i < formattedValue.length; i += 1) {
+            if (/\d/.test(formattedValue[i])) {
+                seenDigits += 1;
+                if (seenDigits === digitIndex) {
+                    return i + 1;
+                }
+            }
+        }
+        return formattedValue.length;
+    }
+
+    function formatPhone(value) {
+        const digits = (value || '').replace(/\D/g, '').slice(0, 10);
+        const p1 = digits.slice(0, 3);
+        const p2 = digits.slice(3, 6);
+        const p3 = digits.slice(6, 10);
+
+        if (digits.length <= 3) return p1 ? `(${p1}` : '';
+        if (digits.length <= 6) return `(${p1})${p2}`;
+        return `(${p1})${p2}-${p3}`;
+    }
+
+    phoneInput.addEventListener('input', function (event) {
+        const rawValue = event.target.value;
+        const cursorPos = event.target.selectionStart || 0;
+        const digitsBefore = digitCountBeforeCursor(rawValue, cursorPos);
+        const formatted = formatPhone(rawValue);
+        event.target.value = formatted;
+        const newCursor = caretPosForDigitIndex(formatted, digitsBefore);
+        event.target.setSelectionRange(newCursor, newCursor);
+    });
+
+    phoneInput.addEventListener('blur', function () {
+        phoneInput.value = formatPhone(phoneInput.value);
+    });
+})();
+</script>
+<script>
+(function () {
+    const postalZipInput = document.getElementById('{{ associate_form.postal_zip_code.id_for_label }}');
+    const physicalZipInput = document.getElementById('{{ associate_form.physical_zip_code.id_for_label }}');
+    const zipInputs = [postalZipInput, physicalZipInput].filter(Boolean);
+    if (!zipInputs.length) return;
+
+    function formatZip(value) {
+        const digits = (value || '').replace(/\D/g, '').slice(0, 9);
+        if (digits.length <= 5) return digits;
+        return digits.slice(0, 5) + '-' + digits.slice(5);
+    }
+
+    zipInputs.forEach((input) => {
+        input.addEventListener('input', function () {
+            const cursorAtEnd = input.selectionStart === input.value.length;
+            input.value = formatZip(input.value);
+            if (cursorAtEnd) {
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
+        input.addEventListener('blur', function () {
+            input.value = formatZip(input.value);
+        });
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

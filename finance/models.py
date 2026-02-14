@@ -1,0 +1,49 @@
+from django.db import models
+
+
+class Commission(models.Model):
+    sale = models.OneToOneField("crm.Sale", on_delete=models.CASCADE, related_name="commission")
+    sales_rep = models.ForeignKey("crm.SalesRep", on_delete=models.CASCADE, related_name="commissions")
+    business_unit = models.ForeignKey("core.BusinessUnit", on_delete=models.CASCADE, related_name="commissions")
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    bonus_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    calculated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-calculated_at"]
+
+    def __str__(self) -> str:
+        return f"Commission Sale #{self.sale_id}"
+
+
+class FinancingCalculatorLink(models.Model):
+    product = models.OneToOneField("inventory.Product", on_delete=models.CASCADE, related_name="financing_calculator")
+    label = models.CharField(max_length=80, default="Calculator")
+    url = models.URLField()
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return f"{self.product} - {self.label}"
+
+
+class FinancialReport(models.Model):
+    business_unit = models.ForeignKey(
+        "core.BusinessUnit",
+        on_delete=models.CASCADE,
+        related_name="financial_reports",
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=120)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    notes = models.TextField(blank=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-generated_at"]
+
+    def __str__(self) -> str:
+        return self.title
