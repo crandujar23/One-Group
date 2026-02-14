@@ -7,7 +7,7 @@
     {% if business_unit.code == "solar-home-power" %}
     <div class="d-flex flex-wrap gap-2 mt-3">
         {% for item in sales_quick_links %}
-        <a href="{{ item.url }}" class="btn btn-light btn-sm fw-semibold px-3" {% if item.url != "#" %}target="_blank" rel="noopener"{% endif %}>
+        <a href="{{ item.url }}" class="btn btn-light btn-sm fw-semibold px-3" {% if item.external and item.url != "#" %}target="_blank" rel="noopener"{% endif %}>
             {{ item.label }}
         </a>
         {% endfor %}
@@ -60,7 +60,7 @@
     <h2 class="h5 mb-3">Ventas recientes</h2>
     <div class="table-responsive">
         <table class="table table-modern table-hover mb-0">
-            <thead><tr><th>ID</th><th>Rep</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
+            <thead><tr><th>ID</th><th>Representante</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
             <tbody>
             {% for sale in recent_sales %}
                 <tr>

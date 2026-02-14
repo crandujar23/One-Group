@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">{{ title }}</h1>
+    <p class="mb-0 opacity-75">{{ subtitle }}</p>
+</section>
+
+<section class="section-card p-3 p-lg-4 reveal reveal-delay-1 tasks-shell">
+    <div class="row g-4">
+        <aside class="col-12 col-xl-4">
+            <div class="tasks-quick-panel">
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if selected_panel == 'event' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-event" type="button">Evento</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if selected_panel == 'task' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-task" type="button">Tarea</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if selected_panel == 'appointment' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-appointment" type="button">Cita</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade {% if selected_panel == 'event' %}show active{% endif %}" id="tab-event">
+                        <form method="post" class="vstack gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create_event">
+                            {{ event_form.non_field_errors }}
+                            <div>{{ event_form.title.label_tag }}{{ event_form.title }}</div>
+                            <div>{{ event_form.description.label_tag }}{{ event_form.description }}</div>
+                            <div>{{ event_form.start_at.label_tag }}{{ event_form.start_at }}</div>
+                            <div>{{ event_form.end_at.label_tag }}{{ event_form.end_at }}</div>
+                            <div class="form-check">{{ event_form.all_day }}{{ event_form.all_day.label_tag }}</div>
+                            <div>{{ event_form.color.label_tag }}{{ event_form.color }}</div>
+                            <button type="submit" class="btn btn-primary">Crear evento</button>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade {% if selected_panel == 'task' %}show active{% endif %}" id="tab-task">
+                        <form method="post" class="vstack gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create_task">
+                            {{ task_form.non_field_errors }}
+                            <div>{{ task_form.title.label_tag }}{{ task_form.title }}</div>
+                            <div>{{ task_form.description.label_tag }}{{ task_form.description }}</div>
+                            <div>{{ task_form.due_at.label_tag }}{{ task_form.due_at }}</div>
+                            <div>{{ task_form.priority.label_tag }}{{ task_form.priority }}</div>
+                            <button type="submit" class="btn btn-primary">Crear tarea</button>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade {% if selected_panel == 'appointment' %}show active{% endif %}" id="tab-appointment">
+                        <form method="post" class="vstack gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="create_appointment">
+                            {{ appointment_form.non_field_errors }}
+                            <div>{{ appointment_form.subject.label_tag }}{{ appointment_form.subject }}</div>
+                            <div>{{ appointment_form.contact_name.label_tag }}{{ appointment_form.contact_name }}</div>
+                            <div>{{ appointment_form.start_at.label_tag }}{{ appointment_form.start_at }}</div>
+                            <div>{{ appointment_form.end_at.label_tag }}{{ appointment_form.end_at }}</div>
+                            <div>{{ appointment_form.location.label_tag }}{{ appointment_form.location }}</div>
+                            <div>{{ appointment_form.status.label_tag }}{{ appointment_form.status }}</div>
+                            <div>{{ appointment_form.notes.label_tag }}{{ appointment_form.notes }}</div>
+                            <button type="submit" class="btn btn-primary">Agendar cita</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tasks-list mt-3">
+                <h2 class="h6 mb-3">Tareas pendientes</h2>
+                {% for item in task_items %}
+                <article class="task-item">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div>
+                            <h3 class="h6 mb-1">{{ item.title }}</h3>
+                            <small class="text-secondary">{{ item.get_priority_display }} | {{ item.due_at|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <span class="badge text-bg-light">{{ item.get_status_display }}</span>
+                    </div>
+                    <form method="post" action="{% url 'dashboard:task_update_status' item.pk %}" class="mt-2 d-flex gap-2">
+                        {% csrf_token %}
+                        <select class="form-select form-select-sm" name="status">
+                            {% for value,label in item.Status.choices %}
+                            <option value="{{ value }}" {% if value == item.status %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button>
+                    </form>
+                </article>
+                {% empty %}
+                <p class="mb-0 text-secondary">No hay tareas registradas.</p>
+                {% endfor %}
+            </div>
+
+            <div class="tasks-list mt-3">
+                <h2 class="h6 mb-3">Agenda de citas</h2>
+                {% for item in appointments %}
+                <article class="task-item">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div>
+                            <h3 class="h6 mb-1">{{ item.subject }}</h3>
+                            <small class="text-secondary">{{ item.contact_name }} | {{ item.start_at|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <span class="badge text-bg-light">{{ item.get_status_display }}</span>
+                    </div>
+                    <form method="post" action="{% url 'dashboard:appointment_update_status' item.pk %}" class="mt-2 d-flex gap-2">
+                        {% csrf_token %}
+                        <select class="form-select form-select-sm" name="status">
+                            {% for value,label in item.Status.choices %}
+                            <option value="{{ value }}" {% if value == item.status %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button>
+                    </form>
+                </article>
+                {% empty %}
+                <p class="mb-0 text-secondary">No hay citas agendadas.</p>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <div class="col-12 col-xl-8">
+            <div id="calendar" class="calendar-panel"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const calendarEl = document.getElementById("calendar");
+    if (!calendarEl || !window.FullCalendar) return;
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: "dayGridMonth",
+        locale: "es",
+        height: "auto",
+        buttonText: {
+            today: "Hoy",
+            month: "Mes",
+            week: "Semana",
+            day: "Día",
+            list: "Agenda"
+        },
+        headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek"
+        },
+        events: "{% url 'dashboard:tasks_calendar_feed' %}",
+        eventTimeFormat: { hour: "2-digit", minute: "2-digit", meridiem: false },
+        navLinks: true,
+        nowIndicator: true,
+        editable: false
+    });
+    calendar.render();
+});
+</script>
+{% endblock %}

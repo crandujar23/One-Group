@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Crear Asociado{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Crear Nuevo Asociado</h1>
+    <p class="mb-0 opacity-75">Crea credenciales de acceso y asigna unidad de negocio.</p>
+</section>
+
+<section class="section-card p-4 reveal reveal-delay-1">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Usuario</label>
+                {{ form.username }}
+                {% for err in form.username.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Correo</label>
+                {{ form.email }}
+                {% for err in form.email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                {{ form.first_name }}
+                {% for err in form.first_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Apellido</label>
+                {{ form.last_name }}
+                {% for err in form.last_name.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Contraseña temporal</label>
+                {{ form.password }}
+                {% for err in form.password.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Unidades de negocio</label>
+                {{ form.business_units }}
+                {% for err in form.business_units.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Nivel</label>
+                {{ form.tier }}
+                {% for err in form.tier.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+        </div>
+        {% for err in form.non_field_errors %}<div class="text-danger small mt-2">{{ err }}</div>{% endfor %}
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">Crear asociado</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

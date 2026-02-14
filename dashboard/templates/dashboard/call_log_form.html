@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}Nuevo Call Log{% endblock %}
+{% block title %}Nuevo Registro de Llamada{% endblock %}
 {% block content %}
 <div class="page-shell reveal">
     <section class="section-card p-3">
-        <h1 class="h3 mb-3">Nuevo Call Log</h1>
+        <h1 class="h3 mb-3">Nuevo Registro de Llamada</h1>
         <form method="post">
             {% csrf_token %}
             {{ form.as_p }}

@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="tools-hero p-4 mb-4 reveal">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h1 class="h2 mb-2">Biblioteca de Recursos CRM</h1>
+            <p class="mb-0 opacity-75">Centraliza documentos, videos y enlaces de trabajo en un solo lugar para el equipo.</p>
+        </div>
+        <button type="button" class="btn tools-new-btn" data-bs-toggle="modal" data-bs-target="#newResourceModal">
+            <i class="bi bi-plus-lg me-1"></i> Nuevo recurso
+        </button>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="section-card p-3 h-100 reveal reveal-delay-1">
+            <p class="tools-metric-label mb-1">Total recursos</p>
+            <p class="tools-metric-value mb-0">{{ total_resources }}</p>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="section-card p-3 h-100 reveal reveal-delay-1">
+            <p class="tools-metric-label mb-1">Con archivo</p>
+            <p class="tools-metric-value mb-0">{{ file_resources }}</p>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="section-card p-3 h-100 reveal reveal-delay-2">
+            <p class="tools-metric-label mb-1">Activos</p>
+            <p class="tools-metric-value mb-0">{{ active_resources }}</p>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="section-card p-3 h-100 reveal reveal-delay-2">
+            <p class="tools-metric-label mb-1">Tags usados</p>
+            <p class="tools-metric-value mb-0">{{ total_tags_used }}</p>
+        </article>
+    </div>
+</div>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-2">
+    <form method="get" class="row g-3">
+        <div class="col-12 col-lg-7">
+            <label for="id_q" class="form-label mb-1">Buscar recurso</label>
+            <input id="id_q" type="text" name="q" value="{{ query }}" class="form-control" placeholder="Nombre, proveedor, descripción...">
+        </div>
+        <div class="col-12 col-lg-5">
+            <label for="id_tag" class="form-label mb-1">Filtrar por tags</label>
+            <select id="id_tag" name="tag" class="form-select">
+                <option value="">Todos</option>
+                {% for tag in available_tags %}
+                <option value="{{ tag.name }}" {% if selected_tag == tag.name %}selected{% endif %}>{{ tag.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+            <a href="{% url 'dashboard:tools' %}" class="btn btn-outline-secondary">Limpiar</a>
+        </div>
+    </form>
+</section>
+
+<section class="section-card p-0 overflow-hidden reveal reveal-delay-3">
+    <div class="table-responsive">
+        <table class="table table-modern mb-0 tools-table">
+            <thead>
+                <tr>
+                    <th>
+                        <a href="{% url 'dashboard:tools' %}?sort=title&q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}" class="tools-sort-link">Nombre</a>
+                    </th>
+                    <th>
+                        <a href="{% url 'dashboard:tools' %}?sort=provider&q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}" class="tools-sort-link">Proveedor</a>
+                    </th>
+                    <th>Descripción</th>
+                    <th>
+                        <a href="{% url 'dashboard:tools' %}?sort=resource_type&q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}" class="tools-sort-link">Tipo</a>
+                    </th>
+                    <th>Tags</th>
+                    <th>
+                        <a href="{% url 'dashboard:tools' %}?sort=-created_at&q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}" class="tools-sort-link">Fecha publicación</a>
+                    </th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resource in resources %}
+                <tr>
+                    <td class="fw-semibold">{{ resource.title }}</td>
+                    <td>{{ resource.provider|default:"Interno" }}</td>
+                    <td class="tools-desc-cell">{{ resource.description|default:"-" }}</td>
+                    <td>{{ resource.source_label }}</td>
+                    <td>
+                        {% for tag in resource.tags.all %}
+                        <span class="badge text-bg-light me-1">{{ tag.name }}</span>
+                        {% empty %}
+                        -
+                        {% endfor %}
+                    </td>
+                    <td>{{ resource.created_at|date:"d/m/Y" }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'dashboard:tools_resource_present' resource.pk %}" class="btn btn-sm btn-outline-primary">Presentar</a>
+                        {% if resource.file %}
+                        <a href="{{ resource.file.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Descargar</a>
+                        {% elif resource.video_url %}
+                        <a href="{{ resource.video_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Abrir</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4">No hay recursos para mostrar.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <p class="mb-0">Mostrando {{ page_obj.paginator.count }} recursos</p>
+        <div class="btn-group">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:tools' %}?q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+            {% else %}
+            <button class="btn btn-sm btn-outline-secondary" disabled>Anterior</button>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:tools' %}?q={{ query|urlencode }}&tag={{ selected_tag|urlencode }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+            {% else %}
+            <button class="btn btn-sm btn-outline-secondary" disabled>Siguiente</button>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<div class="modal fade" id="newResourceModal" tabindex="-1" aria-labelledby="newResourceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="newResourceModalLabel">Nuevo recurso</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ resource_form.title.id_for_label }}">{{ resource_form.title.label }}</label>
+                            {{ resource_form.title }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ resource_form.provider.id_for_label }}">{{ resource_form.provider.label }}</label>
+                            {{ resource_form.provider }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ resource_form.description.id_for_label }}">{{ resource_form.description.label }}</label>
+                            {{ resource_form.description }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ resource_form.resource_type.id_for_label }}">{{ resource_form.resource_type.label }}</label>
+                            {{ resource_form.resource_type }}
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="form-check">
+                                {{ resource_form.is_active }}
+                                <label class="form-check-label" for="{{ resource_form.is_active.id_for_label }}">{{ resource_form.is_active.label }}</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ resource_form.file.id_for_label }}">{{ resource_form.file.label }}</label>
+                            {{ resource_form.file }}
+                            <div class="form-text">{{ resource_form.file.help_text }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ resource_form.video_url.id_for_label }}">{{ resource_form.video_url.label }}</label>
+                            {{ resource_form.video_url }}
+                            <div class="form-text">{{ resource_form.video_url.help_text }}</div>
+                            <div id="drive-link-tip" class="form-text text-warning d-none">
+                                Para Google Drive: usa enlace de archivo y verifica "Cualquier persona con el enlace".
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ resource_form.tags_input.id_for_label }}">{{ resource_form.tags_input.label }}</label>
+                            {{ resource_form.tags_input }}
+                            <div class="form-text">{{ resource_form.tags_input.help_text }}</div>
+                        </div>
+                    </div>
+                    {% if resource_form.errors %}
+                    <div class="alert alert-danger mt-3 mb-0">
+                        {{ resource_form.errors }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar recurso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    const videoInput = document.getElementById('id_resource-video_url');
+    const driveTip = document.getElementById('drive-link-tip');
+    const drivePattern = /^https?:\/\/(drive|docs)\.google\.com\/(file\/d\/[^\/?#]+|.*[?&]id=[^&]+)/i;
+
+    if (videoInput && driveTip) {
+        const toggleDriveTip = function () {
+            const value = (videoInput.value || '').trim();
+            const isDrive = /https?:\/\/(drive|docs)\.google\.com\//i.test(value);
+            if (!isDrive) {
+                driveTip.classList.add('d-none');
+                driveTip.textContent = 'Para Google Drive: usa enlace de archivo y verifica "Cualquier persona con el enlace".';
+                return;
+            }
+            driveTip.classList.remove('d-none');
+            if (!drivePattern.test(value)) {
+                driveTip.textContent = 'Formato esperado: https://drive.google.com/file/d/<ID>/view';
+            } else {
+                driveTip.textContent = 'Recuerda: el archivo debe estar compartido en modo "Cualquier persona con el enlace".';
+            }
+        };
+        videoInput.addEventListener('input', toggleDriveTip);
+        videoInput.addEventListener('blur', toggleDriveTip);
+        toggleDriveTip();
+    }
+
+    {% if resource_form.errors %}
+    window.addEventListener('load', function () {
+        const modalNode = document.getElementById('newResourceModal');
+        if (!modalNode || !window.bootstrap) return;
+        const modal = new bootstrap.Modal(modalNode);
+        modal.show();
+    });
+    {% endif %}
+})();
+</script>
+{% endblock %}

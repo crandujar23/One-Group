@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
-{% block title %}Admin Overview{% endblock %}
+{% block title %}Resumen Administrativo{% endblock %}
 {% block content %}
 <section class="hero-card p-4 mb-4 reveal">
-    <h1 class="h3 mb-2">Executive Overview</h1>
+    <h1 class="h3 mb-2">Resumen Ejecutivo</h1>
     <p class="mb-0 opacity-75">Vista global para gestión de unidades de negocio y desempeño comercial.</p>
 </section>
 
@@ -51,7 +51,7 @@
     <h2 class="h5 mb-3">Ventas recientes</h2>
     <div class="table-responsive">
         <table class="table table-modern table-hover mb-0">
-            <thead><tr><th>ID</th><th>Rep</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
+            <thead><tr><th>ID</th><th>Representante</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
             <tbody>
             {% for sale in recent_sales %}
                 <tr>

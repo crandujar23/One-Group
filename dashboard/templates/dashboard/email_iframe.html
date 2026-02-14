@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Accede a tu Correo{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Accede a tu Correo</h1>
+    <p class="mb-0 opacity-75">Vista embebida del acceso al correo.</p>
+</section>
+
+<section class="section-card p-2 p-md-3 reveal reveal-delay-1">
+    <iframe
+        src="{{ email_url }}"
+        title="Accede a tu Correo"
+        loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin"
+        style="width: 100%; min-height: 78vh; border: 0; border-radius: 0.75rem; background: #ffffff;"
+    ></iframe>
+    <p class="text-muted small mt-3 mb-0">
+        Si el sitio externo bloquea la visualizacion en iframe, abre el acceso al correo en una nueva pestana:
+        <a href="{{ email_url }}" target="_blank" rel="noopener">{{ email_url }}</a>
+    </p>
+</section>
+{% endblock %}

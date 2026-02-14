@@ -4,8 +4,8 @@
 <section class="hero-card p-4 mb-4 reveal">
     <div class="d-flex flex-column flex-md-row align-items-md-center gap-3">
         <div>
-            {% if sales_rep and sales_rep.avatar %}
-            <img src="{{ sales_rep.avatar.url }}" alt="Avatar del asociado" class="associate-avatar">
+            {% if profile_avatar_url %}
+            <img src="{{ profile_avatar_url }}" alt="Avatar del perfil" class="associate-avatar">
             {% else %}
             <div class="associate-avatar associate-avatar-placeholder">
                 {{ request.user.username|slice:":1"|upper }}
@@ -13,11 +13,11 @@
             {% endif %}
         </div>
         <div>
-            <h1 class="h3 mb-2">Perfil del Asociado</h1>
+            <h1 class="h3 mb-2">Mi Perfil</h1>
             <p class="mb-0 opacity-75">
                 {{ request.user.get_full_name|default:request.user.username }}
                 {% if sales_rep %}
-                    {% if sales_rep.tier %}| Tier: {{ sales_rep.tier.name }}{% endif %}
+                    {% if sales_rep.tier %}| Nivel: {{ sales_rep.tier.name }}{% endif %}
                     | Unidad: {{ sales_rep.business_unit.name }}
                 {% else %}
                     | Perfil administrativo
@@ -98,7 +98,7 @@
                                 {% endif %}
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email</label>
+                                <label class="form-label">Correo</label>
                                 {{ user_form.email }}
                                 {% for err in user_form.email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
                             </div>
@@ -191,22 +191,14 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Fecha de ingreso</label>
-                                {% if associate_form %}
-                                    {{ associate_form.hire_date }}
-                                    {% for err in associate_form.hire_date.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
-                                {% else %}
-                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
-                                {% endif %}
+                                {{ work_form.hire_date }}
+                                {% for err in work_form.hire_date.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Foto / Avatar</label>
-                                {% if associate_form %}
-                                    {{ associate_form.avatar }}
-                                    {% for err in associate_form.avatar.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
-                                    <div class="form-text">Formatos: JPG, PNG, WEBP. Máximo 2MB.</div>
-                                {% else %}
-                                    <input type="text" class="form-control" disabled value="No aplica para este perfil">
-                                {% endif %}
+                                {{ work_form.avatar }}
+                                {% for err in work_form.avatar.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+                                <div class="form-text">Formatos: JPG, PNG, WEBP. Máximo 2MB.</div>
                             </div>
                         </div>
                     </div>
@@ -220,7 +212,7 @@
 
     <div class="col-lg-5 reveal reveal-delay-2">
         <section class="section-card p-4 h-100">
-            <h2 class="h5 mb-3">Resumen Financiero y Rewards</h2>
+            <h2 class="h5 mb-3">Resumen Financiero y Recompensas</h2>
             <ul class="list-group mb-3">
                 <li class="list-group-item d-flex justify-content-between"><span>Ventas Totales</span><strong>${{ total_revenue }}</strong></li>
                 <li class="list-group-item d-flex justify-content-between"><span>Comisiones</span><strong>${{ total_commission }}</strong></li>

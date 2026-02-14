@@ -29,9 +29,11 @@ Persistencia:
 
 ## Roles y alcance de datos
 
-- `Admin (OneGroup)`: vista global.
-- `Manager`: acceso acotado por `BusinessUnit`.
-- `SalesRep`: solo ve su propia información (ventas/puntos/call logs).
+Orden vigente:
+
+- `Partner`: vista global de plataforma (sin acceso a `/admin/`).
+- `Administrador`: acceso acotado por `BusinessUnit`.
+- `Asociado`: solo ve su propia información (ventas/puntos/call logs).
 
 ## Setup rápido
 

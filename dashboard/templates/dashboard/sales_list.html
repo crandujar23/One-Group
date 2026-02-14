@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}Sales List{% endblock %}
+{% block title %}Listado de Ventas{% endblock %}
 {% block content %}
 <div class="page-shell reveal">
     <section class="section-card p-3">
         <h1 class="h3 mb-3">Ventas</h1>
         <div class="table-responsive">
             <table class="table table-modern table-hover">
-                <thead><tr><th>ID</th><th>BU</th><th>Rep</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
+                <thead><tr><th>ID</th><th>Unidad</th><th>Representante</th><th>Producto</th><th>Estado</th><th>Monto</th></tr></thead>
                 <tbody>
                 {% for sale in sales %}
                     <tr>

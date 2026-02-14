@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}Call Logs{% endblock %}
+{% block title %}Registro de Llamadas{% endblock %}
 {% block content %}
 <div class="page-shell reveal">
     <section class="section-card p-3">
         <div class="d-flex justify-content-between mb-3">
-            <h1 class="h3 mb-0">Call Logs</h1>
+            <h1 class="h3 mb-0">Registro de Llamadas</h1>
             {% if is_sales_rep_user %}
-            <a href="{% url 'dashboard:call_log_create' %}" class="btn btn-primary">Nuevo log</a>
+            <a href="{% url 'dashboard:call_log_create' %}" class="btn btn-primary">Nuevo registro</a>
             {% endif %}
         </div>
         <div class="table-responsive">
             <table class="table table-modern table-hover">
-                <thead><tr><th>Rep</th><th>Tipo</th><th>Asunto</th><th>Venta</th><th>Fecha</th></tr></thead>
+                <thead><tr><th>Representante</th><th>Tipo</th><th>Asunto</th><th>Venta</th><th>Fecha</th></tr></thead>
                 <tbody>
                 {% for log in call_logs %}
                     <tr>
@@ -28,7 +28,7 @@
             </table>
         </div>
         {% if page_obj.paginator.num_pages > 1 %}
-        <nav aria-label="Paginacion call logs">
+        <nav aria-label="Paginacion de registros de llamadas">
           <ul class="pagination mb-0">
             {% if page_obj.has_previous %}
               <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>

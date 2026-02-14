@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -23,9 +24,9 @@ class BusinessUnit(models.Model):
 
 class UserProfile(models.Model):
     class Role(models.TextChoices):
-        ADMIN = "ADMIN", "Admin (OneGroup)"
-        MANAGER = "MANAGER", "Manager"
-        SALES_REP = "SALES_REP", "SalesRep"
+        ADMIN = "ADMIN", "Partner"
+        MANAGER = "MANAGER", "Administrador"
+        SALES_REP = "SALES_REP", "Asociado"
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.SALES_REP)
@@ -35,6 +36,18 @@ class UserProfile(models.Model):
         null=True,
         blank=True,
         related_name="user_profiles",
+    )
+    business_units = models.ManyToManyField(
+        BusinessUnit,
+        blank=True,
+        related_name="scoped_user_profiles",
+    )
+    hire_date = models.DateField(null=True, blank=True)
+    avatar = models.ImageField(
+        upload_to="profiles/avatars/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["jpg", "jpeg", "png", "webp"])],
     )
 
     def __str__(self) -> str:

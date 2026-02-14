@@ -9,6 +9,14 @@ from dashboard.forms import PasswordResetRequestForm
 from dashboard.forms import PasswordResetSetForm
 from dashboard.views import OneGroupLoginView
 
+
+def _admin_has_permission(request):
+    return bool(request.user.is_active and request.user.is_superuser)
+
+
+admin.site.has_permission = _admin_has_permission
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("dashboard.urls")),

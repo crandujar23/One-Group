@@ -32,6 +32,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Allow internal iframes on the same host (used by resource presentation page).
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# YouTube embed requires a cross-origin referrer (Error 153 when missing).
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 ROOT_URLCONF = "onegroup_platform.urls"
 
 TEMPLATES = [
@@ -66,7 +72,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "es"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True

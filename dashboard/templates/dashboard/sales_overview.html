@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}Sales Overview{% endblock %}
+{% block title %}Resumen de Ventas{% endblock %}
 {% block content %}
 <section class="hero-card p-4 mb-4 reveal">
-    <h1 class="h3 mb-2">Sales Command Center</h1>
+    <h1 class="h3 mb-2">Centro de Control de Ventas</h1>
     {% if sales_rep %}
-    <p class="mb-0 opacity-75">Rep: {{ sales_rep.user.username }} | Tier: {{ sales_rep.tier|default:'N/A' }}</p>
+    <p class="mb-0 opacity-75">Representante: {{ sales_rep.user.username }} | Nivel: {{ sales_rep.tier|default:'Sin nivel' }}</p>
     {% else %}
     <p class="mb-0 opacity-75">Visión consolidada de desempeño comercial.</p>
     {% endif %}

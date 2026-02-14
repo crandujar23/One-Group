@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}Sale Detail{% endblock %}
+{% block title %}Detalle de Venta{% endblock %}
 {% block content %}
 <div class="page-shell reveal">
     <section class="section-card p-3 mb-3">
         <h1 class="h3 mb-3">Detalle de venta #{{ sale.id }}</h1>
         <ul class="list-group mb-0">
             <li class="list-group-item"><strong>Business Unit:</strong> {{ sale.business_unit.name }}</li>
-            <li class="list-group-item"><strong>SalesRep:</strong> {{ sale.sales_rep.user.username }}</li>
+            <li class="list-group-item"><strong>Representante:</strong> {{ sale.sales_rep.user.username }}</li>
             <li class="list-group-item"><strong>Producto:</strong> {{ sale.product.name }}</li>
             <li class="list-group-item"><strong>Plan:</strong> {{ sale.plan.name }}</li>
             <li class="list-group-item"><strong>Estado:</strong> {{ sale.get_status_display }}</li>

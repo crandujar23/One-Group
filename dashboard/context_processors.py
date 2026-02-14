@@ -23,15 +23,32 @@ def _initials(value):
 
 def _role_label(user, profile):
     if user.is_superuser:
-        return "Superadmin"
+        return "Superadministrador"
     if profile:
         if profile.role == UserProfile.Role.ADMIN:
-            return "Admin"
+            return "Socio"
         if profile.role == UserProfile.Role.MANAGER:
-            return "Manager"
+            return "Administrador"
         if profile.role == UserProfile.Role.SALES_REP:
             return "Asociado"
     return "Usuario"
+
+
+def _is_platform_admin(user, profile):
+    return bool(user.is_superuser or (profile and profile.role == UserProfile.Role.ADMIN))
+
+
+def _is_associate(profile, sales_rep):
+    return bool(profile and profile.role == UserProfile.Role.SALES_REP and sales_rep)
+
+
+def _manager_business_unit_ids(profile):
+    if not profile or profile.role != UserProfile.Role.MANAGER:
+        return []
+    ids = list(profile.business_units.values_list("id", flat=True))
+    if not ids and profile.business_unit_id:
+        ids = [profile.business_unit_id]
+    return ids
 
 
 def navigation_context(request):
@@ -46,15 +63,15 @@ def navigation_context(request):
     unit_nav_items = []
     for item in BUSINESS_UNIT_PAGES:
         unit = business_unit_by_code.get(item["code"])
-        if not unit:
+        if not unit and not _is_platform_admin(user, profile):
             continue
 
         allowed = False
-        if profile and profile.role == UserProfile.Role.ADMIN:
+        if _is_platform_admin(user, profile):
             allowed = True
         elif profile and profile.role == UserProfile.Role.MANAGER:
-            allowed = profile.business_unit_id == unit.id
-        elif sales_rep:
+            allowed = unit.id in _manager_business_unit_ids(profile)
+        elif _is_associate(profile, sales_rep):
             allowed = True
 
         if allowed:
@@ -69,9 +86,13 @@ def navigation_context(request):
     operations_nav_items = [
         {"label": "Ventas", "url_name": "dashboard:sales_list", "url_key": "sales_list"},
         {"label": "Financiamiento", "url_name": "dashboard:financing", "url_key": "financing"},
-        {"label": "Call Logs", "url_name": "dashboard:call_logs", "url_key": "call_logs"},
+        {"label": "Registro de llamadas", "url_name": "dashboard:call_logs", "url_key": "call_logs"},
     ]
-    if sales_rep:
+    if user.is_superuser:
+        operations_nav_items.insert(0, {"label": "Gestión de Accesos", "url_name": "dashboard:access_management", "url_key": "access_management"})
+    if _is_platform_admin(user, profile):
+        operations_nav_items.insert(1, {"label": "Nuevo Asociado", "url_name": "dashboard:associate_create", "url_key": "associate_create"})
+    if _is_associate(profile, sales_rep) or _is_platform_admin(user, profile):
         operations_nav_items.insert(1, {"label": "Puntos", "url_name": "dashboard:points_summary", "url_key": "points_summary"})
     workspace_nav_items = [
         {"label": "Gestión de Clientes", "url_name": "dashboard:client_management", "url_key": "client_management"},
@@ -80,7 +101,11 @@ def navigation_context(request):
         {"label": "Herramientas", "url_name": "dashboard:tools", "url_key": "tools"},
     ]
     nav_display_name = _display_name(user, sales_rep)
-    nav_avatar_url = sales_rep.avatar.url if sales_rep and sales_rep.avatar else ""
+    nav_avatar_url = ""
+    if profile and profile.avatar:
+        nav_avatar_url = profile.avatar.url
+    elif sales_rep and sales_rep.avatar:
+        nav_avatar_url = sales_rep.avatar.url
 
     return {
         "nav_profile": profile,
@@ -94,7 +119,7 @@ def navigation_context(request):
         "unit_nav_items": unit_nav_items,
         "operations_nav_items": operations_nav_items,
         "workspace_nav_items": workspace_nav_items,
-        "is_admin_user": bool(profile and profile.role == UserProfile.Role.ADMIN),
+        "is_admin_user": _is_platform_admin(user, profile),
         "is_manager_user": bool(profile and profile.role == UserProfile.Role.MANAGER),
-        "is_sales_rep_user": bool(sales_rep),
+        "is_sales_rep_user": _is_associate(profile, sales_rep),
     }
