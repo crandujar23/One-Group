@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
@@ -22,6 +23,7 @@ from dashboard.forms import CallLogForm
 from dashboard.forms import LoginForm
 from dashboard.forms import UserProfileForm
 from finance.models import Commission
+from finance.models import FinancingPartner
 from rewards.models import Redemption, RewardPoint
 
 
@@ -107,6 +109,15 @@ def _daily_sales_chart_data(sales_qs):
     return {"labels": labels, "values": values, "color": "#6f42c1"}
 
 
+def _sales_quick_links():
+    return [
+        {"label": "Asesor Energetico", "url": settings.ENERGY_ADVISOR_URL},
+        {"label": "Cotizador", "url": settings.QUOTER_URL},
+        {"label": "Accede SUNRUN", "url": settings.SUNRUN_ACCESS_URL},
+        {"label": "Accede Tu Email", "url": settings.EMAIL_ACCESS_URL},
+    ]
+
+
 @login_required
 def home(request):
     profile = _profile(request.user)
@@ -158,6 +169,7 @@ def business_unit_overview(request, unit_key):
         "title": f"Unidad de Negocio: {business_unit.name}",
         "unit_label": page["label"],
         "business_unit": business_unit,
+        "sales_quick_links": _sales_quick_links(),
         "total_sales": sales.count(),
         "confirmed_sales": sales.filter(status=Sale.Status.CONFIRMED).count(),
         "total_amount": sales.aggregate(value=Sum("amount"))["value"] or 0,
@@ -353,3 +365,114 @@ def call_log_create(request):
         form.fields["sale"].queryset = sale_queryset
 
     return render(request, "dashboard/call_log_form.html", {"form": form})
+
+
+@login_required
+def financing(request):
+    partner_type = request.GET.get("type", "").upper().strip()
+    active_only = request.GET.get("active", "1") == "1"
+
+    partners = FinancingPartner.objects.prefetch_related("business_units").order_by("priority", "name")
+    if partner_type in FinancingPartner.PartnerType.values:
+        partners = partners.filter(partner_type=partner_type)
+    if active_only:
+        partners = partners.filter(is_active=True)
+
+    context = {
+        "title": "Financiamiento",
+        "partners": partners,
+        "selected_type": partner_type,
+        "active_only": active_only,
+        "partner_types": FinancingPartner.PartnerType.choices,
+    }
+    return render(request, "dashboard/financing_list.html", context)
+
+
+def _workspace_page_context(section_key):
+    pages = {
+        "client_management": {
+            "title": "Gestión de Clientes",
+            "subtitle": "Centraliza prospectos, contactos y seguimiento comercial en una sola vista.",
+            "highlights": [
+                "Pipeline de clientes por etapa comercial.",
+                "Historial de interacción y recordatorios.",
+                "Segmentación por unidad de negocio y estado.",
+            ],
+        },
+        "my_team": {
+            "title": "Mi equipo",
+            "subtitle": "Visualiza desempeño, responsabilidades y carga operativa del equipo.",
+            "highlights": [
+                "Vista de miembros por rol y unidad.",
+                "Indicadores de productividad y cumplimiento.",
+                "Canal para coordinación interna.",
+            ],
+        },
+        "tasks": {
+            "title": "Tareas",
+            "subtitle": "Organiza pendientes críticos con enfoque en cumplimiento diario.",
+            "highlights": [
+                "Priorización por urgencia e impacto.",
+                "Asignación de responsables y fechas objetivo.",
+                "Seguimiento de tareas abiertas, en progreso y completadas.",
+            ],
+        },
+        "tools": {
+            "title": "Herramientas",
+            "subtitle": "Accede rápidamente a utilidades operativas del negocio.",
+            "highlights": [
+                "Atajos a reportes y módulos frecuentes.",
+                "Recursos internos para ventas y soporte.",
+                "Utilidades para análisis y productividad.",
+            ],
+        },
+        "legal": {
+            "title": "Legales",
+            "subtitle": "Consulta políticas, términos y lineamientos vigentes de la plataforma.",
+            "highlights": [
+                "Políticas de privacidad y manejo de datos.",
+                "Términos y condiciones de uso interno.",
+                "Cumplimiento y documentación regulatoria.",
+            ],
+        },
+        "help": {
+            "title": "Ayuda",
+            "subtitle": "Soporte y recursos para resolver dudas operativas.",
+            "highlights": [
+                "Guías rápidas por módulo.",
+                "Preguntas frecuentes y buenas prácticas.",
+                "Canales de soporte para incidencias.",
+            ],
+        },
+    }
+    return pages[section_key]
+
+
+@login_required
+def client_management(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("client_management"))
+
+
+@login_required
+def my_team(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("my_team"))
+
+
+@login_required
+def tasks(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("tasks"))
+
+
+@login_required
+def tools(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("tools"))
+
+
+@login_required
+def legal(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("legal"))
+
+
+@login_required
+def help_center(request):
+    return render(request, "dashboard/workspace_page.html", _workspace_page_context("help"))

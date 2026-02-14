@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Financiamiento{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Financiamiento</h1>
+    <p class="mb-0 opacity-75">Directorio de bancos y cooperativas que pueden brindar soluciones financieras a clientes.</p>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label for="id_type" class="form-label">Tipo de entidad</label>
+            <select id="id_type" name="type" class="form-select">
+                <option value="">Todas</option>
+                {% for value, label in partner_types %}
+                <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check mt-4 pt-2">
+                <input class="form-check-input" type="checkbox" name="active" value="1" id="id_active" {% if active_only %}checked{% endif %}>
+                <label class="form-check-label" for="id_active">Solo entidades activas</label>
+            </div>
+        </div>
+        <div class="col-md-4 d-grid">
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+        </div>
+    </form>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-2">
+    <div class="table-responsive">
+        <table class="table table-modern table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Entidad</th>
+                    <th>Tipo</th>
+                    <th>Servicios</th>
+                    <th>Contacto</th>
+                    <th>Unidades de negocio</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for partner in partners %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ partner.name }}</div>
+                        {% if partner.website %}
+                        <a href="{{ partner.website }}" target="_blank" rel="noopener" class="small text-decoration-none">Sitio web</a>
+                        {% endif %}
+                    </td>
+                    <td>{{ partner.get_partner_type_display }}</td>
+                    <td>{{ partner.services|default:'-' }}</td>
+                    <td>
+                        {% if partner.contact_name %}<div>{{ partner.contact_name }}</div>{% endif %}
+                        {% if partner.contact_email %}<div class="small">{{ partner.contact_email }}</div>{% endif %}
+                        {% if partner.contact_phone %}<div class="small">{{ partner.contact_phone }}</div>{% endif %}
+                        {% if not partner.contact_name and not partner.contact_email and not partner.contact_phone %}-{% endif %}
+                    </td>
+                    <td>
+                        {% for unit in partner.business_units.all %}
+                        <span class="badge text-bg-light border me-1">{{ unit.name }}</span>
+                        {% empty %}
+                        <span class="text-muted">Todas</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if partner.is_active %}
+                        <span class="status-pill status-confirmed">Activa</span>
+                        {% else %}
+                        <span class="status-pill status-default">Inactiva</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No hay entidades financieras registradas con estos filtros.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

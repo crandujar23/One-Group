@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from finance.models import Commission, FinancialReport, FinancingCalculatorLink
+from finance.models import Commission, FinancialReport, FinancingCalculatorLink, FinancingPartner
 
 
 @admin.register(Commission)
@@ -22,3 +22,11 @@ class FinancialReportAdmin(admin.ModelAdmin):
     list_display = ("title", "business_unit", "period_start", "period_end", "generated_at")
     list_filter = ("business_unit",)
     search_fields = ("title", "notes")
+
+
+@admin.register(FinancingPartner)
+class FinancingPartnerAdmin(admin.ModelAdmin):
+    list_display = ("name", "partner_type", "is_active", "priority", "updated_at")
+    list_filter = ("partner_type", "is_active", "business_units")
+    search_fields = ("name", "contact_name", "contact_email")
+    filter_horizontal = ("business_units",)

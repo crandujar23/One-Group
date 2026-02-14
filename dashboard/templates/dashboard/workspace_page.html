@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">{{ title }}</h1>
+    <p class="mb-0 opacity-75">{{ subtitle }}</p>
+</section>
+
+<section class="section-card p-4 reveal reveal-delay-1">
+    <h2 class="h5 mb-3">Resumen</h2>
+    <ul class="mb-0">
+        {% for item in highlights %}
+        <li class="mb-2">{{ item }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

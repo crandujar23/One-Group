@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -81,3 +82,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard:home"
 LOGOUT_REDIRECT_URL = "login"
+
+EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@onegroup.local")
+
+ENERGY_ADVISOR_URL = os.getenv("ENERGY_ADVISOR_URL", "#")
+QUOTER_URL = os.getenv("QUOTER_URL", "#")
+SUNRUN_ACCESS_URL = os.getenv("SUNRUN_ACCESS_URL", "#")
+EMAIL_ACCESS_URL = os.getenv("EMAIL_ACCESS_URL", "#")

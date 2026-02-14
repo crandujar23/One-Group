@@ -20,4 +20,11 @@ urlpatterns = [
     path("points/", views.points_summary, name="points_summary"),
     path("call-logs/", views.call_logs, name="call_logs"),
     path("call-logs/new/", views.call_log_create, name="call_log_create"),
+    path("financiamiento/", views.financing, name="financing"),
+    path("gestion-clientes/", views.client_management, name="client_management"),
+    path("mi-equipo/", views.my_team, name="my_team"),
+    path("tareas/", views.tasks, name="tasks"),
+    path("herramientas/", views.tools, name="tools"),
+    path("legales/", views.legal, name="legal"),
+    path("ayuda/", views.help_center, name="help_center"),
 ]

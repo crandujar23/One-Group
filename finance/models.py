@@ -47,3 +47,33 @@ class FinancialReport(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class FinancingPartner(models.Model):
+    class PartnerType(models.TextChoices):
+        BANK = "BANK", "Banco"
+        COOPERATIVE = "COOPERATIVE", "Cooperativa"
+        OTHER = "OTHER", "Otro"
+
+    name = models.CharField(max_length=120, unique=True)
+    partner_type = models.CharField(max_length=16, choices=PartnerType.choices, default=PartnerType.BANK)
+    business_units = models.ManyToManyField("core.BusinessUnit", related_name="financing_partners", blank=True)
+    contact_name = models.CharField(max_length=120, blank=True)
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(max_length=30, blank=True)
+    website = models.URLField(blank=True)
+    services = models.TextField(
+        blank=True,
+        help_text="Describe los servicios financieros disponibles: préstamos personales, comerciales, líneas verdes, etc.",
+    )
+    notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    priority = models.PositiveSmallIntegerField(default=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["priority", "name"]
+
+    def __str__(self) -> str:
+        return self.name

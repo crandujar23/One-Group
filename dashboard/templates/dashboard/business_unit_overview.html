@@ -3,7 +3,16 @@
 {% block content %}
 <section class="hero-card p-4 mb-4 reveal">
     <h1 class="h3 mb-2">{{ unit_label }}</h1>
-    <p class="mb-0 opacity-75">Unidad de negocio: {{ business_unit.name }} ({{ business_unit.code }})</p>
+    <p class="mb-0 opacity-75">Unidad de negocio: {{ business_unit.name }}</p>
+    {% if business_unit.code == "solar-home-power" %}
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        {% for item in sales_quick_links %}
+        <a href="{{ item.url }}" class="btn btn-light btn-sm fw-semibold px-3" {% if item.url != "#" %}target="_blank" rel="noopener"{% endif %}>
+            {{ item.label }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </section>
 
 <div class="row g-3 mb-4">
