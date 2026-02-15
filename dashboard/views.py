@@ -26,17 +26,21 @@ from dashboard.business_units import BUSINESS_UNIT_PAGES_BY_KEY
 from dashboard.forms import AssociateAccessCreateForm
 from dashboard.forms import AccessManagementAssignForm
 from dashboard.forms import AccessManagementCreateForm
+from dashboard.forms import AnnouncementForm
 from dashboard.forms import AppointmentForm
 from dashboard.forms import AssociateProfileForm
 from dashboard.forms import CallLogForm
 from dashboard.forms import CalendarEventForm
 from dashboard.forms import LoginForm
+from dashboard.forms import OfferForm
 from dashboard.forms import SharedResourceForm
 from dashboard.forms import TaskForm
 from dashboard.forms import UserWorkProfileForm
 from dashboard.forms import UserProfileForm
 from dashboard.models import Appointment
+from dashboard.models import Announcement
 from dashboard.models import CalendarEvent
+from dashboard.models import Offer
 from dashboard.models import ResourceTag
 from dashboard.models import SharedResource
 from dashboard.models import Task
@@ -231,8 +235,25 @@ def admin_overview(request):
         return HttpResponseForbidden("No autorizado")
 
     sales = _sales_queryset(request.user, profile, _sales_rep(request.user))
+    today = timezone.localdate()
+    active_announcements = Announcement.objects.filter(is_active=True, start_date__lte=today, end_date__gte=today).order_by(
+        "-start_date", "-created_at"
+    )
+    announcement_slides = []
+    for announcement in active_announcements:
+        announcement_slides.append(
+            {
+                "announcement": announcement,
+                "video_embed_url": announcement.get_video_embed_url(request)
+                if announcement.media_type == Announcement.MediaType.VIDEO
+                else None,
+            }
+        )
+
     context = {
         "title": "Resumen para Socio/Administrador",
+        "active_announcements": active_announcements,
+        "announcement_slides": announcement_slides,
         "total_sales": sales.count(),
         "confirmed_sales": sales.filter(status=Sale.Status.CONFIRMED).count(),
         "total_amount": sales.aggregate(value=Sum("amount"))["value"] or 0,
@@ -282,6 +303,23 @@ def business_unit_overview(request, unit_key):
         "daily_sales_chart": _daily_sales_chart_data(sales),
         "recent_sales": sales[:10],
     }
+    if business_unit:
+        today = timezone.localdate()
+        active_offers = Offer.objects.filter(
+            is_active=True,
+            start_date__lte=today,
+            end_date__gte=today,
+            business_units=business_unit,
+        ).distinct().order_by("-start_date", "-created_at")
+        offer_slides = []
+        for offer in active_offers:
+            offer_slides.append(
+                {
+                    "offer": offer,
+                    "video_embed_url": offer.get_video_embed_url(request) if offer.media_type == Offer.MediaType.VIDEO else None,
+                }
+            )
+        context["offer_slides"] = offer_slides
     return render(request, "dashboard/business_unit_overview.html", context)
 
 
@@ -874,15 +912,88 @@ def appointment_update_status(request, pk):
 @login_required
 def tools(request):
     form = SharedResourceForm(prefix="resource")
+    announcement_form = AnnouncementForm(prefix="announcement")
+    offer_form = OfferForm(prefix="offer")
+    can_manage_announcements = _can_manage(request.user, _profile(request.user))
+
     if request.method == "POST":
-        form = SharedResourceForm(request.POST, request.FILES, prefix="resource")
-        if form.is_valid():
-            resource = form.save(commit=False)
-            resource.created_by = request.user
-            resource.save()
-            tags = form.get_tags()
-            resource.tags.set(tags)
-            messages.success(request, "Recurso publicado correctamente.")
+        action = request.POST.get("action")
+        if action == "create_resource":
+            form = SharedResourceForm(request.POST, request.FILES, prefix="resource")
+            if form.is_valid():
+                resource = form.save(commit=False)
+                resource.created_by = request.user
+                resource.save()
+                tags = form.get_tags()
+                resource.tags.set(tags)
+                messages.success(request, "Recurso publicado correctamente.")
+                return redirect("dashboard:tools")
+        elif action == "create_announcement":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para crear anuncios.")
+            announcement_form = AnnouncementForm(request.POST, request.FILES, prefix="announcement")
+            if announcement_form.is_valid():
+                announcement = announcement_form.save(commit=False)
+                announcement.created_by = request.user
+                announcement.save()
+                messages.success(request, "Anuncio publicado correctamente.")
+                return redirect("dashboard:tools")
+        elif action == "update_announcement":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para editar anuncios.")
+            announcement_id = request.POST.get("announcement_id")
+            announcement = get_object_or_404(Announcement, pk=announcement_id)
+            edit_form = AnnouncementForm(request.POST, request.FILES, prefix="announcement", instance=announcement)
+            if edit_form.is_valid():
+                edit_form.save()
+                messages.success(request, "Anuncio actualizado correctamente.")
+            else:
+                messages.error(request, f"No se pudo actualizar el anuncio: {edit_form.errors.as_text()}")
+            return redirect("dashboard:tools")
+        elif action == "delete_announcement":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para eliminar anuncios.")
+            announcement_id = request.POST.get("announcement_id")
+            announcement = Announcement.objects.filter(pk=announcement_id).first()
+            if not announcement:
+                messages.error(request, "El anuncio no existe o ya fue eliminado.")
+            else:
+                announcement.delete()
+                messages.success(request, "Anuncio eliminado correctamente.")
+            return redirect("dashboard:tools")
+        elif action == "create_offer":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para crear ofertas.")
+            offer_form = OfferForm(request.POST, request.FILES, prefix="offer")
+            if offer_form.is_valid():
+                offer = offer_form.save(commit=False)
+                offer.created_by = request.user
+                offer.save()
+                offer_form.save_m2m()
+                messages.success(request, "Oferta publicada correctamente.")
+                return redirect("dashboard:tools")
+        elif action == "update_offer":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para editar ofertas.")
+            offer_id = request.POST.get("offer_id")
+            offer = get_object_or_404(Offer, pk=offer_id)
+            edit_form = OfferForm(request.POST, request.FILES, prefix="offer", instance=offer)
+            if edit_form.is_valid():
+                edit_form.save()
+                messages.success(request, "Oferta actualizada correctamente.")
+            else:
+                messages.error(request, f"No se pudo actualizar la oferta: {edit_form.errors.as_text()}")
+            return redirect("dashboard:tools")
+        elif action == "delete_offer":
+            if not can_manage_announcements:
+                return HttpResponseForbidden("No autorizado para eliminar ofertas.")
+            offer_id = request.POST.get("offer_id")
+            offer = Offer.objects.filter(pk=offer_id).first()
+            if not offer:
+                messages.error(request, "La oferta no existe o ya fue eliminada.")
+            else:
+                offer.delete()
+                messages.success(request, "Oferta eliminada correctamente.")
             return redirect("dashboard:tools")
 
     query = (request.GET.get("q") or "").strip()
@@ -916,6 +1027,12 @@ def tools(request):
     context.update(
         {
             "resource_form": form,
+            "announcement_form": announcement_form,
+            "offer_form": offer_form,
+            "can_manage_announcements": can_manage_announcements,
+            "announcements": Announcement.objects.select_related("created_by").order_by("-start_date", "-created_at")[:10],
+            "offers": Offer.objects.select_related("created_by").prefetch_related("business_units").order_by("-start_date", "-created_at")[:10],
+            "active_business_units": BusinessUnit.objects.filter(is_active=True).order_by("name"),
             "resources": page_obj.object_list,
             "page_obj": page_obj,
             "query": query,

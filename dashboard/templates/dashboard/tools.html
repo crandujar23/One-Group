@@ -13,6 +13,316 @@
     </div>
 </section>
 
+{% if can_manage_announcements %}
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+            <h2 class="h5 mb-1">Anuncios para Administracion</h2>
+            <p class="mb-0 text-muted small">Se muestran automaticamente en la parte superior de Admin Overview cuando estan vigentes.</p>
+        </div>
+        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newAnnouncementModal">
+            <i class="bi bi-megaphone me-1"></i> Crear anuncio
+        </button>
+    </div>
+    <div class="table-responsive mt-3">
+        <table class="table table-modern mb-0">
+            <thead>
+                <tr>
+                    <th>Titulo</th>
+                    <th>Linea Comercial</th>
+                    <th>Inicio</th>
+                    <th>Finalizacion</th>
+                    <th>Medio</th>
+                    <th>Estado</th>
+                    <th>Creado por</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for announcement in announcements %}
+                <tr>
+                    <td class="fw-semibold">{{ announcement.title }}</td>
+                    <td>{{ announcement.start_date|date:"d/m/Y" }}</td>
+                    <td>{{ announcement.end_date|date:"d/m/Y" }}</td>
+                    <td>{{ announcement.get_media_type_display }}</td>
+                    <td>{% if announcement.is_active %}Activo{% else %}Inactivo{% endif %}</td>
+                    <td>{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}</td>
+                    <td class="text-end">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#editAnnouncementModal-{{ announcement.id }}"
+                        >
+                            Editar
+                        </button>
+                        <form method="post" class="d-inline" onsubmit="return confirm('¿Eliminar este anuncio? Esta accion no se puede deshacer.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_announcement">
+                            <input type="hidden" name="announcement_id" value="{{ announcement.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-3">No hay anuncios registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% for announcement in announcements %}
+<div class="modal fade announcement-modal announcement-edit-modal" id="editAnnouncementModal-{{ announcement.id }}" tabindex="-1" aria-labelledby="editAnnouncementModalLabel-{{ announcement.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="editAnnouncementModalLabel-{{ announcement.id }}">Editar anuncio</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_announcement">
+                    <input type="hidden" name="announcement_id" value="{{ announcement.id }}">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="edit-announcement-title-{{ announcement.id }}">Titulo del anuncio</label>
+                            <input type="text" class="form-control" id="edit-announcement-title-{{ announcement.id }}" name="announcement-title" value="{{ announcement.title }}" required maxlength="160">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="edit-announcement-message-{{ announcement.id }}">Contenido</label>
+                            <textarea class="d-none" id="edit-announcement-message-{{ announcement.id }}" name="announcement-message" rows="3" required>{{ announcement.message }}</textarea>
+                            <div class="announcement-editor-toolbar mb-2" role="toolbar" aria-label="Formato del anuncio">
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="bold"><strong>B</strong></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="italic"><em>I</em></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="underline"><u>U</u></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertUnorderedList">Lista</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertOrderedList">Numerada</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="createLink">Enlace</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="removeFormat">Limpiar</button>
+                            </div>
+                            <div
+                                class="form-control announcement-rich-editor"
+                                data-editor-input-id="edit-announcement-message-{{ announcement.id }}"
+                                contenteditable="true"
+                                role="textbox"
+                                aria-label="Contenido del anuncio"
+                                style="min-height: 120px;"
+                            ></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-announcement-start-{{ announcement.id }}">Fecha de implementacion</label>
+                            <input type="date" class="form-control" id="edit-announcement-start-{{ announcement.id }}" name="announcement-start_date" value="{{ announcement.start_date|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-announcement-end-{{ announcement.id }}">Fecha de finalizacion</label>
+                            <input type="date" class="form-control" id="edit-announcement-end-{{ announcement.id }}" name="announcement-end_date" value="{{ announcement.end_date|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="edit-announcement-media-type-{{ announcement.id }}">Tipo de medio</label>
+                            <select
+                                class="form-select announcement-media-type-input"
+                                id="edit-announcement-media-type-{{ announcement.id }}"
+                                name="announcement-media_type"
+                                data-announcement-media-prefix="edit-{{ announcement.id }}"
+                            >
+                                {% for value, label in announcement_form.fields.media_type.choices %}
+                                <option value="{{ value }}" {% if announcement.media_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 announcement-file-group" data-announcement-media-target="edit-{{ announcement.id }}">
+                            <label class="form-label" for="edit-announcement-file-{{ announcement.id }}">Archivo (PDF o imagen)</label>
+                            <input type="file" class="form-control announcement-file-input" id="edit-announcement-file-{{ announcement.id }}" name="announcement-media_file">
+                            {% if announcement.media_file %}
+                            <div class="form-text">
+                                Archivo actual:
+                                <a href="{{ announcement.media_file.url }}" target="_blank" rel="noopener">Abrir</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 announcement-video-group" data-announcement-media-target="edit-{{ announcement.id }}">
+                            <label class="form-label" for="edit-announcement-video-{{ announcement.id }}">Enlace de video</label>
+                            <input type="url" class="form-control announcement-video-input" id="edit-announcement-video-{{ announcement.id }}" name="announcement-video_url" value="{{ announcement.video_url }}" placeholder="https://...">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="announcement-is_active" id="edit-announcement-active-{{ announcement.id }}" {% if announcement.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="edit-announcement-active-{{ announcement.id }}">Activo</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+        <div>
+            <h2 class="h5 mb-1">Ofertas por producto</h2>
+            <p class="mb-0 text-muted small">Se muestran en la pagina del producto seleccionado cuando estan vigentes.</p>
+        </div>
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#newOfferModal">
+            <i class="bi bi-tag me-1"></i> Crear oferta
+        </button>
+    </div>
+    <div class="table-responsive mt-3">
+        <table class="table table-modern mb-0">
+            <thead>
+                <tr>
+                    <th>Titulo</th>
+                    <th>Inicio</th>
+                    <th>Finalizacion</th>
+                    <th>Medio</th>
+                    <th>Estado</th>
+                    <th>Creado por</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for offer in offers %}
+                <tr>
+                    <td class="fw-semibold">{{ offer.title }}</td>
+                    <td>
+                        {% for unit in offer.business_units.all %}
+                        <span class="badge text-bg-light me-1">{{ unit.name }}</span>
+                        {% empty %}
+                        -
+                        {% endfor %}
+                    </td>
+                    <td>{{ offer.start_date|date:"d/m/Y" }}</td>
+                    <td>{{ offer.end_date|date:"d/m/Y" }}</td>
+                    <td>{{ offer.get_media_type_display }}</td>
+                    <td>{% if offer.is_active %}Activo{% else %}Inactivo{% endif %}</td>
+                    <td>{{ offer.created_by.get_full_name|default:offer.created_by.username }}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editOfferModal-{{ offer.id }}">Editar</button>
+                        <form method="post" class="d-inline" onsubmit="return confirm('¿Eliminar esta oferta? Esta accion no se puede deshacer.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_offer">
+                            <input type="hidden" name="offer_id" value="{{ offer.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-3">No hay ofertas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% for offer in offers %}
+<div class="modal fade announcement-modal" id="editOfferModal-{{ offer.id }}" tabindex="-1" aria-labelledby="editOfferModalLabel-{{ offer.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="editOfferModalLabel-{{ offer.id }}">Editar oferta</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_offer">
+                    <input type="hidden" name="offer_id" value="{{ offer.id }}">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="edit-offer-title-{{ offer.id }}">Titulo de la oferta</label>
+                            <input type="text" class="form-control" id="edit-offer-title-{{ offer.id }}" name="offer-title" value="{{ offer.title }}" required maxlength="160">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="edit-offer-message-{{ offer.id }}">Contenido</label>
+                            <textarea class="d-none" id="edit-offer-message-{{ offer.id }}" name="offer-message" rows="3" required>{{ offer.message }}</textarea>
+                            <div class="announcement-editor-toolbar mb-2" role="toolbar" aria-label="Formato de la oferta">
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="bold"><strong>B</strong></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="italic"><em>I</em></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="underline"><u>U</u></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertUnorderedList">Lista</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertOrderedList">Numerada</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="createLink">Enlace</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="removeFormat">Limpiar</button>
+                            </div>
+                            <div class="form-control announcement-rich-editor" data-editor-input-id="edit-offer-message-{{ offer.id }}" contenteditable="true" role="textbox" aria-label="Contenido de la oferta"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-offer-start-{{ offer.id }}">Fecha de implementacion</label>
+                            <input type="date" class="form-control" id="edit-offer-start-{{ offer.id }}" name="offer-start_date" value="{{ offer.start_date|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-offer-end-{{ offer.id }}">Fecha de finalizacion</label>
+                            <input type="date" class="form-control" id="edit-offer-end-{{ offer.id }}" name="offer-end_date" value="{{ offer.end_date|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label d-block">Linea Comercial</label>
+                            <div class="row g-2">
+                                {% for unit in active_business_units %}
+                                <div class="col-12 col-md-4">
+                                    <div class="form-check">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            name="offer-business_units"
+                                            id="edit-offer-unit-{{ offer.id }}-{{ unit.id }}"
+                                            value="{{ unit.id }}"
+                                            {% if unit in offer.business_units.all %}checked{% endif %}
+                                        >
+                                        <label class="form-check-label" for="edit-offer-unit-{{ offer.id }}-{{ unit.id }}">{{ unit.name }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="edit-offer-media-type-{{ offer.id }}">Tipo de medio</label>
+                            <select class="form-select offer-media-type-input" id="edit-offer-media-type-{{ offer.id }}" name="offer-media_type" data-offer-media-prefix="edit-offer-{{ offer.id }}">
+                                {% for value, label in offer_form.fields.media_type.choices %}
+                                <option value="{{ value }}" {% if offer.media_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 offer-file-group" data-offer-media-target="edit-offer-{{ offer.id }}">
+                            <label class="form-label" for="edit-offer-file-{{ offer.id }}">Archivo (PDF o imagen)</label>
+                            <input type="file" class="form-control offer-file-input" id="edit-offer-file-{{ offer.id }}" name="offer-media_file">
+                            {% if offer.media_file %}
+                            <div class="form-text">Archivo actual: <a href="{{ offer.media_file.url }}" target="_blank" rel="noopener">Abrir</a></div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 offer-video-group" data-offer-media-target="edit-offer-{{ offer.id }}">
+                            <label class="form-label" for="edit-offer-video-{{ offer.id }}">Enlace de video</label>
+                            <input type="url" class="form-control offer-video-input" id="edit-offer-video-{{ offer.id }}" name="offer-video_url" value="{{ offer.video_url }}" placeholder="https://...">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="offer-is_active" id="edit-offer-active-{{ offer.id }}" {% if offer.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="edit-offer-active-{{ offer.id }}">Activo</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
 <div class="row g-3 mb-4">
     <div class="col-12 col-md-6 col-xl-3">
         <article class="section-card p-3 h-100 reveal reveal-delay-1">
@@ -141,6 +451,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="create_resource">
                 <div class="modal-body">
                     {% csrf_token %}
                     <div class="row g-3">
@@ -199,10 +510,283 @@
         </div>
     </div>
 </div>
+
+{% if can_manage_announcements %}
+<div class="modal fade announcement-modal" id="newAnnouncementModal" tabindex="-1" aria-labelledby="newAnnouncementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="newAnnouncementModalLabel">Nuevo anuncio</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_announcement">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="{{ announcement_form.title.id_for_label }}">{{ announcement_form.title.label }}</label>
+                            {{ announcement_form.title }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ announcement_form.message.id_for_label }}">{{ announcement_form.message.label }}</label>
+                            {{ announcement_form.message.as_hidden }}
+                            <div class="announcement-editor-toolbar mb-2" role="toolbar" aria-label="Formato del anuncio">
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="bold"><strong>B</strong></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="italic"><em>I</em></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="underline"><u>U</u></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertUnorderedList">Lista</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertOrderedList">Numerada</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="createLink">Enlace</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="removeFormat">Limpiar</button>
+                            </div>
+                            <div
+                                class="form-control announcement-rich-editor"
+                                data-editor-input-id="{{ announcement_form.message.id_for_label }}"
+                                contenteditable="true"
+                                role="textbox"
+                                aria-label="Contenido del anuncio"
+                                style="min-height: 120px;"
+                            ></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ announcement_form.start_date.id_for_label }}">{{ announcement_form.start_date.label }}</label>
+                            {{ announcement_form.start_date }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ announcement_form.end_date.id_for_label }}">{{ announcement_form.end_date.label }}</label>
+                            {{ announcement_form.end_date }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ announcement_form.media_type.id_for_label }}">{{ announcement_form.media_type.label }}</label>
+                            <div class="d-none">
+                                {{ announcement_form.media_type }}
+                            </div>
+                            <div class="row g-2" id="announcement-media-cards" role="group" aria-label="Tipo de medio">
+                                <div class="col-12 col-md-3">
+                                    <button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="none">
+                                        <i class="bi bi-slash-circle me-1"></i> Sin medio
+                                    </button>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="pdf">
+                                        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                                    </button>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="image">
+                                        <i class="bi bi-image me-1"></i> Imagen
+                                    </button>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="video">
+                                        <i class="bi bi-play-btn me-1"></i> Video
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text">Selecciona si el anuncio llevara PDF, imagen o video.</div>
+                        </div>
+                        <div class="col-md-6" id="announcement-file-group">
+                            <label class="form-label" for="{{ announcement_form.media_file.id_for_label }}">{{ announcement_form.media_file.label }}</label>
+                            {{ announcement_form.media_file }}
+                            <div class="form-text">
+                                {{ announcement_form.media_file.help_text }}
+                                <span class="d-block">Usa este campo cuando el tipo sea <strong>PDF</strong> o <strong>Imagen</strong>.</span>
+                            </div>
+                        </div>
+                        <div class="col-12" id="announcement-video-group">
+                            <label class="form-label" for="{{ announcement_form.video_url.id_for_label }}">{{ announcement_form.video_url.label }}</label>
+                            {{ announcement_form.video_url }}
+                            <div class="form-text">
+                                {{ announcement_form.video_url.help_text }}
+                                <span class="d-block">Usa este campo cuando el tipo sea <strong>Video</strong>.</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ announcement_form.is_active }}
+                                <label class="form-check-label" for="{{ announcement_form.is_active.id_for_label }}">{{ announcement_form.is_active.label }}</label>
+                            </div>
+                        </div>
+                    </div>
+                    {% if announcement_form.errors %}
+                    <div class="alert alert-danger mt-3 mb-0">{{ announcement_form.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar anuncio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade announcement-modal" id="newOfferModal" tabindex="-1" aria-labelledby="newOfferModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="newOfferModalLabel">Nueva oferta</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_offer">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="{{ offer_form.title.id_for_label }}">{{ offer_form.title.label }}</label>
+                            {{ offer_form.title }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ offer_form.message.id_for_label }}">{{ offer_form.message.label }}</label>
+                            {{ offer_form.message.as_hidden }}
+                            <div class="announcement-editor-toolbar mb-2" role="toolbar" aria-label="Formato de la oferta">
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="bold"><strong>B</strong></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="italic"><em>I</em></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="underline"><u>U</u></button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertUnorderedList">Lista</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="insertOrderedList">Numerada</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="createLink">Enlace</button>
+                                <button type="button" class="btn btn-outline-secondary" data-editor-action="removeFormat">Limpiar</button>
+                            </div>
+                            <div class="form-control announcement-rich-editor" data-editor-input-id="{{ offer_form.message.id_for_label }}" contenteditable="true" role="textbox" aria-label="Contenido de la oferta"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ offer_form.start_date.id_for_label }}">{{ offer_form.start_date.label }}</label>
+                            {{ offer_form.start_date }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ offer_form.end_date.id_for_label }}">{{ offer_form.end_date.label }}</label>
+                            {{ offer_form.end_date }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label d-block" for="{{ offer_form.business_units.id_for_label }}">{{ offer_form.business_units.label }}</label>
+                            <div class="row g-2">
+                                {% for checkbox in offer_form.business_units %}
+                                <div class="col-12 col-md-4">
+                                    <div class="form-check">
+                                        {{ checkbox.tag }}
+                                        <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if offer_form.business_units.errors %}
+                            <div class="text-danger small mt-1">{{ offer_form.business_units.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ offer_form.media_type.id_for_label }}">{{ offer_form.media_type.label }}</label>
+                            <div class="d-none">{{ offer_form.media_type }}</div>
+                            <div class="row g-2" id="offer-media-cards" role="group" aria-label="Tipo de medio de oferta">
+                                <div class="col-12 col-md-3"><button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="none"><i class="bi bi-slash-circle me-1"></i> Sin medio</button></div>
+                                <div class="col-12 col-md-3"><button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="pdf"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button></div>
+                                <div class="col-12 col-md-3"><button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="image"><i class="bi bi-image me-1"></i> Imagen</button></div>
+                                <div class="col-12 col-md-3"><button type="button" class="btn btn-outline-secondary w-100 text-start" data-media-value="video"><i class="bi bi-play-btn me-1"></i> Video</button></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="offer-file-group">
+                            <label class="form-label" for="{{ offer_form.media_file.id_for_label }}">{{ offer_form.media_file.label }}</label>
+                            {{ offer_form.media_file }}
+                            <div class="form-text">{{ offer_form.media_file.help_text }}</div>
+                        </div>
+                        <div class="col-12" id="offer-video-group">
+                            <label class="form-label" for="{{ offer_form.video_url.id_for_label }}">{{ offer_form.video_url.label }}</label>
+                            {{ offer_form.video_url }}
+                            <div class="form-text">{{ offer_form.video_url.help_text }}</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ offer_form.is_active }}
+                                <label class="form-check-label" for="{{ offer_form.is_active.id_for_label }}">{{ offer_form.is_active.label }}</label>
+                            </div>
+                        </div>
+                    </div>
+                    {% if offer_form.errors %}
+                    <div class="alert alert-danger mt-3 mb-0">{{ offer_form.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar oferta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block extra_js %}
 <script>
 (function () {
+    const escapeHtml = function (value) {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
+    const initAnnouncementEditors = function () {
+        const editors = document.querySelectorAll('.announcement-rich-editor[data-editor-input-id]');
+        editors.forEach(function (editor) {
+            const inputId = editor.dataset.editorInputId;
+            const hiddenInput = document.getElementById(inputId);
+            if (!hiddenInput) return;
+
+            const rawValue = (hiddenInput.value || '').trim();
+            if (rawValue) {
+                if (rawValue.indexOf('<') !== -1 && rawValue.indexOf('>') !== -1) {
+                    editor.innerHTML = rawValue;
+                } else {
+                    editor.innerHTML = escapeHtml(rawValue).replace(/\n/g, '<br>');
+                }
+            } else {
+                editor.innerHTML = '<p><br></p>';
+            }
+
+            const syncToInput = function () {
+                hiddenInput.value = editor.innerHTML.trim();
+            };
+
+            editor.addEventListener('input', syncToInput);
+            editor.addEventListener('blur', syncToInput);
+
+            const toolbar = editor.previousElementSibling;
+            if (toolbar && toolbar.classList.contains('announcement-editor-toolbar')) {
+                toolbar.querySelectorAll('[data-editor-action]').forEach(function (button) {
+                    button.addEventListener('click', function () {
+                        const action = button.dataset.editorAction;
+                        editor.focus();
+                        if (action === 'createLink') {
+                            const url = window.prompt('Pega la URL del enlace (https://...)');
+                            if (!url) return;
+                            document.execCommand('createLink', false, url);
+                            return;
+                        }
+                        document.execCommand(action, false, null);
+                        syncToInput();
+                    });
+                });
+            }
+
+            const form = editor.closest('form');
+            if (form && !form.dataset.editorSyncBound) {
+                form.addEventListener('submit', function () {
+                    form.querySelectorAll('.announcement-rich-editor[data-editor-input-id]').forEach(function (formEditor) {
+                        const formInput = document.getElementById(formEditor.dataset.editorInputId);
+                        if (formInput) {
+                            formInput.value = formEditor.innerHTML.trim();
+                        }
+                    });
+                });
+                form.dataset.editorSyncBound = '1';
+            }
+        });
+    };
+
     const videoInput = document.getElementById('id_resource-video_url');
     const driveTip = document.getElementById('drive-link-tip');
     const drivePattern = /^https?:\/\/(drive|docs)\.google\.com\/(file\/d\/[^\/?#]+|.*[?&]id=[^&]+)/i;
@@ -227,10 +811,169 @@
         videoInput.addEventListener('blur', toggleDriveTip);
         toggleDriveTip();
     }
+    initAnnouncementEditors();
+
+    const syncAnnouncementMediaFields = function (mediaTypeInput, fileGroup, videoGroup, fileInput, videoInput, mediaCards) {
+        if (!mediaTypeInput || !fileGroup || !videoGroup) return;
+        const value = mediaTypeInput.value;
+        const fileEnabled = value === 'pdf' || value === 'image';
+        const videoEnabled = value === 'video';
+
+        fileGroup.classList.toggle('opacity-50', !fileEnabled);
+        videoGroup.classList.toggle('opacity-50', !videoEnabled);
+
+        if (fileInput) {
+            fileInput.disabled = !fileEnabled;
+            if (value === 'pdf') {
+                fileInput.setAttribute('accept', '.pdf');
+            } else if (value === 'image') {
+                fileInput.setAttribute('accept', '.jpg,.jpeg,.png,.webp,.gif');
+            } else {
+                fileInput.removeAttribute('accept');
+            }
+        }
+        if (videoInput) {
+            videoInput.disabled = !videoEnabled;
+        }
+        if (mediaCards && mediaCards.length) {
+            mediaCards.forEach(function (button) {
+                const isActive = button.dataset.mediaValue === value;
+                button.classList.toggle('btn-primary', isActive);
+                button.classList.toggle('btn-outline-secondary', !isActive);
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        }
+    };
+
+    const announcementMediaType = document.getElementById('id_announcement-media_type');
+    const announcementMediaCards = document.querySelectorAll('#announcement-media-cards [data-media-value]');
+    const announcementFileGroup = document.getElementById('announcement-file-group');
+    const announcementVideoGroup = document.getElementById('announcement-video-group');
+    if (announcementMediaType && announcementFileGroup && announcementVideoGroup) {
+        const fileInput = announcementFileGroup.querySelector('input[type="file"]');
+        const videoInput = announcementVideoGroup.querySelector('input[type="url"]');
+        announcementMediaCards.forEach(function (button) {
+            button.addEventListener('click', function () {
+                announcementMediaType.value = button.dataset.mediaValue;
+                syncAnnouncementMediaFields(
+                    announcementMediaType,
+                    announcementFileGroup,
+                    announcementVideoGroup,
+                    fileInput,
+                    videoInput,
+                    announcementMediaCards
+                );
+            });
+        });
+        announcementMediaType.addEventListener('change', function () {
+            syncAnnouncementMediaFields(
+                announcementMediaType,
+                announcementFileGroup,
+                announcementVideoGroup,
+                fileInput,
+                videoInput,
+                announcementMediaCards
+            );
+        });
+        syncAnnouncementMediaFields(
+            announcementMediaType,
+            announcementFileGroup,
+            announcementVideoGroup,
+            fileInput,
+            videoInput,
+            announcementMediaCards
+        );
+    }
+
+    const editMediaTypeInputs = document.querySelectorAll('.announcement-media-type-input');
+    editMediaTypeInputs.forEach(function (mediaTypeInput) {
+        const prefix = mediaTypeInput.dataset.announcementMediaPrefix;
+        const fileGroup = document.querySelector('.announcement-file-group[data-announcement-media-target="' + prefix + '"]');
+        const videoGroup = document.querySelector('.announcement-video-group[data-announcement-media-target="' + prefix + '"]');
+        if (!fileGroup || !videoGroup) return;
+        const fileInput = fileGroup.querySelector('.announcement-file-input');
+        const videoInput = videoGroup.querySelector('.announcement-video-input');
+        const syncCurrent = function () {
+            syncAnnouncementMediaFields(mediaTypeInput, fileGroup, videoGroup, fileInput, videoInput, []);
+        };
+        mediaTypeInput.addEventListener('change', syncCurrent);
+        syncCurrent();
+    });
+
+    const offerMediaType = document.getElementById('id_offer-media_type');
+    const offerMediaCards = document.querySelectorAll('#offer-media-cards [data-media-value]');
+    const offerFileGroup = document.getElementById('offer-file-group');
+    const offerVideoGroup = document.getElementById('offer-video-group');
+    if (offerMediaType && offerFileGroup && offerVideoGroup) {
+        const fileInput = offerFileGroup.querySelector('input[type="file"]');
+        const videoInput = offerVideoGroup.querySelector('input[type="url"]');
+        offerMediaCards.forEach(function (button) {
+            button.addEventListener('click', function () {
+                offerMediaType.value = button.dataset.mediaValue;
+                syncAnnouncementMediaFields(
+                    offerMediaType,
+                    offerFileGroup,
+                    offerVideoGroup,
+                    fileInput,
+                    videoInput,
+                    offerMediaCards
+                );
+            });
+        });
+        offerMediaType.addEventListener('change', function () {
+            syncAnnouncementMediaFields(
+                offerMediaType,
+                offerFileGroup,
+                offerVideoGroup,
+                fileInput,
+                videoInput,
+                offerMediaCards
+            );
+        });
+        syncAnnouncementMediaFields(
+            offerMediaType,
+            offerFileGroup,
+            offerVideoGroup,
+            fileInput,
+            videoInput,
+            offerMediaCards
+        );
+    }
+
+    const editOfferMediaTypeInputs = document.querySelectorAll('.offer-media-type-input');
+    editOfferMediaTypeInputs.forEach(function (mediaTypeInput) {
+        const prefix = mediaTypeInput.dataset.offerMediaPrefix;
+        const fileGroup = document.querySelector('.offer-file-group[data-offer-media-target="' + prefix + '"]');
+        const videoGroup = document.querySelector('.offer-video-group[data-offer-media-target="' + prefix + '"]');
+        if (!fileGroup || !videoGroup) return;
+        const fileInput = fileGroup.querySelector('.offer-file-input');
+        const videoInput = videoGroup.querySelector('.offer-video-input');
+        const syncCurrent = function () {
+            syncAnnouncementMediaFields(mediaTypeInput, fileGroup, videoGroup, fileInput, videoInput, []);
+        };
+        mediaTypeInput.addEventListener('change', syncCurrent);
+        syncCurrent();
+    });
 
     {% if resource_form.errors %}
     window.addEventListener('load', function () {
         const modalNode = document.getElementById('newResourceModal');
+        if (!modalNode || !window.bootstrap) return;
+        const modal = new bootstrap.Modal(modalNode);
+        modal.show();
+    });
+    {% endif %}
+    {% if announcement_form.errors and can_manage_announcements %}
+    window.addEventListener('load', function () {
+        const modalNode = document.getElementById('newAnnouncementModal');
+        if (!modalNode || !window.bootstrap) return;
+        const modal = new bootstrap.Modal(modalNode);
+        modal.show();
+    });
+    {% endif %}
+    {% if offer_form.errors and can_manage_announcements %}
+    window.addEventListener('load', function () {
+        const modalNode = document.getElementById('newOfferModal');
         if (!modalNode || !window.bootstrap) return;
         const modal = new bootstrap.Modal(modalNode);
         modal.show();

@@ -688,6 +688,17 @@ html[data-theme="dark"] .tools-iframe-wrap {
     text-decoration: underline;
 }
 
+.announcement-banner {
+    border-radius: 12px;
+    border: 1px solid rgba(14, 165, 198, 0.35);
+    background: linear-gradient(120deg, rgba(14, 165, 198, 0.14), rgba(25, 135, 84, 0.12));
+}
+
+html[data-theme="dark"] .announcement-banner {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: linear-gradient(120deg, rgba(14, 116, 144, 0.24), rgba(22, 101, 52, 0.22));
+}
+
 .tools-present-hero {
     border-radius: 14px;
     color: #fff;
@@ -713,4 +724,63 @@ html[data-theme="dark"] .tools-iframe-wrap {
 .tools-iframe-stage:fullscreen iframe {
     min-height: 100vh;
     height: 100vh;
+}
+
+.announcement-carousel .carousel-control-prev,
+.announcement-carousel .carousel-control-next {
+    width: 8%;
+}
+
+.announcement-carousel-icon {
+    background-color: rgba(15, 23, 42, 0.55);
+    border-radius: 999px;
+    background-size: 58% 58%;
+}
+
+.announcement-carousel .carousel-item .ratio {
+    max-width: 860px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.announcement-carousel .carousel-item img {
+    max-height: 360px !important;
+}
+
+.announcement-modal .modal-dialog {
+    max-width: 920px;
+}
+
+.announcement-modal .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.announcement-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.announcement-editor-toolbar .btn {
+    padding: 0.32rem 0.7rem;
+}
+
+.announcement-rich-editor {
+    min-height: 170px;
+    max-height: 280px;
+    overflow-y: auto;
+    line-height: 1.45;
+    white-space: normal;
+}
+
+@media (max-width: 767px) {
+    .announcement-modal .modal-body {
+        max-height: 74vh;
+    }
+
+    .announcement-rich-editor {
+        min-height: 140px;
+        max-height: 220px;
+    }
 }

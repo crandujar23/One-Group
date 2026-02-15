@@ -1,0 +1,84 @@
+{% if offer_slides %}
+<section class="section-card p-3 mb-3 reveal">
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <h2 class="h5 mb-0">Ofertas vigentes</h2>
+        <span class="small text-muted">{{ offer_slides|length }} activa{{ offer_slides|length|pluralize }}</span>
+    </div>
+    <div
+        id="offersCarousel"
+        class="carousel slide announcement-carousel"
+        data-bs-ride="carousel"
+        data-bs-interval="5000"
+        data-bs-touch="true"
+        data-bs-pause="false"
+    >
+        <div class="carousel-indicators">
+            {% for slide in offer_slides %}
+            <button
+                type="button"
+                data-bs-target="#offersCarousel"
+                data-bs-slide-to="{{ forloop.counter0 }}"
+                {% if forloop.first %}class="active" aria-current="true"{% endif %}
+                aria-label="Oferta {{ forloop.counter }}"
+            ></button>
+            {% endfor %}
+        </div>
+        <div class="carousel-inner rounded-4 overflow-hidden border">
+            {% for slide in offer_slides %}
+            {% with offer=slide.offer %}
+            <article class="carousel-item {% if forloop.first %}active{% endif %}">
+                <div class="p-3 p-md-4 bg-white">
+                    {% if offer.media_type == "video" and slide.video_embed_url %}
+                    <div class="ratio ratio-16x9 rounded-3 overflow-hidden bg-dark">
+                        <iframe
+                            src="{{ slide.video_embed_url }}"
+                            title="Video de oferta"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen
+                            referrerpolicy="strict-origin-when-cross-origin"
+                        ></iframe>
+                    </div>
+                    {% elif offer.media_type == "pdf" and offer.media_file %}
+                    <div class="ratio ratio-16x9 rounded-3 overflow-hidden bg-light border">
+                        <iframe
+                            src="{{ offer.media_file.url }}"
+                            title="PDF de oferta"
+                            loading="lazy"
+                        ></iframe>
+                    </div>
+                    {% elif offer.media_type == "image" and offer.media_file %}
+                    <div class="text-center bg-light rounded-3 border p-2">
+                        <img
+                            src="{{ offer.media_file.url }}"
+                            alt="{{ offer.title }}"
+                            class="img-fluid rounded-2"
+                            style="max-height: 360px; width: auto;"
+                        >
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mt-3">
+                        <div>
+                            <h3 class="h5 mb-1">{{ offer.title }}</h3>
+                            <div class="mb-0 text-muted">{{ offer.message|safe }}</div>
+                        </div>
+                        <span class="small text-muted">{{ offer.start_date|date:"d/m/Y" }} - {{ offer.end_date|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+            </article>
+            {% endwith %}
+            {% endfor %}
+        </div>
+        {% if offer_slides|length > 1 %}
+        <button class="carousel-control-prev" type="button" data-bs-target="#offersCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon announcement-carousel-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Anterior</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#offersCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon announcement-carousel-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Siguiente</span>
+        </button>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

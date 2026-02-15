@@ -1,7 +1,9 @@
 from django.contrib import admin
 
 from dashboard.models import Appointment
+from dashboard.models import Announcement
 from dashboard.models import CalendarEvent
+from dashboard.models import Offer
 from dashboard.models import ResourceTag
 from dashboard.models import SharedResource
 from dashboard.models import Task
@@ -40,3 +42,17 @@ class SharedResourceAdmin(admin.ModelAdmin):
 class ResourceTagAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ("title", "media_type", "start_date", "end_date", "is_active", "created_by", "created_at")
+    list_filter = ("media_type", "is_active", "start_date", "end_date", "created_by")
+    search_fields = ("title", "message", "video_url")
+
+
+@admin.register(Offer)
+class OfferAdmin(admin.ModelAdmin):
+    list_display = ("title", "media_type", "start_date", "end_date", "is_active", "created_by", "created_at")
+    list_filter = ("media_type", "is_active", "start_date", "end_date", "created_by")
+    search_fields = ("title", "message", "video_url")

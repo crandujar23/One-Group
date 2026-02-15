@@ -246,3 +246,260 @@ class ResourceTag(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Announcement(models.Model):
+    class MediaType(models.TextChoices):
+        NONE = "none", "Sin medio"
+        PDF = "pdf", "PDF"
+        VIDEO = "video", "Video"
+        IMAGE = "image", "Imagen"
+
+    MAX_PDF_SIZE = 30 * 1024 * 1024
+    MAX_IMAGE_SIZE = 8 * 1024 * 1024
+    PDF_EXTENSIONS = {".pdf"}
+    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+    title = models.CharField(max_length=160)
+    message = models.TextField()
+    start_date = models.DateField()
+    end_date = models.DateField()
+    media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.NONE)
+    media_file = models.FileField(upload_to="announcements/", blank=True, null=True)
+    video_url = models.URLField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="announcements")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        super().clean()
+        if self.end_date and self.start_date and self.end_date < self.start_date:
+            raise ValidationError({"end_date": "La fecha de finalizacion debe ser igual o posterior a la de implementacion."})
+
+        file_name = (self.media_file.name or "").lower() if self.media_file else ""
+
+        if self.media_type == self.MediaType.NONE:
+            if self.media_file or self.video_url:
+                raise ValidationError("Si seleccionas 'Sin medio', no agregues archivo ni enlace.")
+            return
+
+        if self.media_type == self.MediaType.PDF:
+            if not self.media_file:
+                raise ValidationError({"media_file": "Debes subir un archivo PDF."})
+            if self.video_url:
+                raise ValidationError({"video_url": "No combines PDF y enlace de video en el mismo anuncio."})
+            if not any(file_name.endswith(ext) for ext in self.PDF_EXTENSIONS):
+                raise ValidationError({"media_file": "Solo se permite archivo PDF para este tipo de anuncio."})
+            if self.media_file.size > self.MAX_PDF_SIZE:
+                raise ValidationError({"media_file": "El PDF no puede superar 30MB."})
+            return
+
+        if self.media_type == self.MediaType.IMAGE:
+            if not self.media_file:
+                raise ValidationError({"media_file": "Debes subir una imagen."})
+            if self.video_url:
+                raise ValidationError({"video_url": "No combines imagen y enlace de video en el mismo anuncio."})
+            if not any(file_name.endswith(ext) for ext in self.IMAGE_EXTENSIONS):
+                raise ValidationError({"media_file": "Solo se permiten imagenes JPG, JPEG, PNG, WEBP o GIF."})
+            if self.media_file.size > self.MAX_IMAGE_SIZE:
+                raise ValidationError({"media_file": "La imagen no puede superar 8MB."})
+            return
+
+        if self.media_type == self.MediaType.VIDEO:
+            if self.media_file:
+                raise ValidationError({"media_file": "Un anuncio de video no debe incluir archivo adjunto."})
+            if not self.video_url:
+                raise ValidationError({"video_url": "Debes agregar el enlace de video."})
+            if not self._video_embed_url():
+                raise ValidationError({"video_url": "El enlace debe ser de YouTube o Google Drive."})
+            return
+
+    def _video_embed_url(self):
+        if not self.video_url:
+            return None
+
+        parsed = urlparse(self.video_url.strip())
+        host = parsed.netloc.lower().replace("www.", "")
+        path_parts = [part for part in parsed.path.split("/") if part]
+        query_params = parse_qs(parsed.query)
+
+        if host in {"youtube.com", "m.youtube.com"}:
+            if parsed.path.startswith("/watch"):
+                video_id = query_params.get("v", [None])[0]
+                if video_id:
+                    return f"https://www.youtube.com/embed/{video_id}"
+            if len(path_parts) >= 2 and path_parts[0] in {"embed", "shorts"}:
+                return f"https://www.youtube.com/embed/{path_parts[1]}"
+
+        if host == "youtu.be" and path_parts:
+            return f"https://www.youtube.com/embed/{path_parts[0]}"
+
+        if host in {"drive.google.com", "docs.google.com"}:
+            file_id = None
+            extra = []
+            if len(path_parts) >= 3 and path_parts[0] == "file" and path_parts[1] == "d":
+                file_id = path_parts[2]
+            if not file_id:
+                file_id = query_params.get("id", [None])[0]
+            resource_key = query_params.get("resourcekey", [None])[0]
+            auth_user = query_params.get("authuser", [None])[0]
+            if resource_key:
+                extra.append(f"resourcekey={resource_key}")
+            if auth_user:
+                extra.append(f"authuser={auth_user}")
+            if file_id:
+                suffix = f"?{'&'.join(extra)}" if extra else ""
+                return f"https://drive.google.com/file/d/{file_id}/preview{suffix}"
+
+        return None
+
+    def get_video_embed_url(self, request=None):
+        embed_url = self._video_embed_url()
+        if not embed_url:
+            return None
+
+        parsed = urlparse(embed_url)
+        host = parsed.netloc.lower().replace("www.", "")
+        if host == "youtube.com" and parsed.path.startswith("/embed/") and request is not None:
+            params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            params["origin"] = request.build_absolute_uri("/")[:-1]
+            params["widget_referrer"] = request.build_absolute_uri()
+            query = urlencode(params)
+            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment))
+        return embed_url
+
+
+class Offer(models.Model):
+    class MediaType(models.TextChoices):
+        NONE = "none", "Sin medio"
+        PDF = "pdf", "PDF"
+        VIDEO = "video", "Video"
+        IMAGE = "image", "Imagen"
+
+    MAX_PDF_SIZE = 30 * 1024 * 1024
+    MAX_IMAGE_SIZE = 8 * 1024 * 1024
+    PDF_EXTENSIONS = {".pdf"}
+    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+    title = models.CharField(max_length=160)
+    message = models.TextField()
+    start_date = models.DateField()
+    end_date = models.DateField()
+    media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.NONE)
+    media_file = models.FileField(upload_to="offers/", blank=True, null=True)
+    video_url = models.URLField(blank=True)
+    business_units = models.ManyToManyField(BusinessUnit, related_name="offers", blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="offers")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+    def clean(self):
+        super().clean()
+        if self.end_date and self.start_date and self.end_date < self.start_date:
+            raise ValidationError({"end_date": "La fecha de finalizacion debe ser igual o posterior a la de implementacion."})
+
+        file_name = (self.media_file.name or "").lower() if self.media_file else ""
+
+        if self.media_type == self.MediaType.NONE:
+            if self.media_file or self.video_url:
+                raise ValidationError("Si seleccionas 'Sin medio', no agregues archivo ni enlace.")
+            return
+
+        if self.media_type == self.MediaType.PDF:
+            if not self.media_file:
+                raise ValidationError({"media_file": "Debes subir un archivo PDF."})
+            if self.video_url:
+                raise ValidationError({"video_url": "No combines PDF y enlace de video en la misma oferta."})
+            if not any(file_name.endswith(ext) for ext in self.PDF_EXTENSIONS):
+                raise ValidationError({"media_file": "Solo se permite archivo PDF para este tipo de oferta."})
+            if self.media_file.size > self.MAX_PDF_SIZE:
+                raise ValidationError({"media_file": "El PDF no puede superar 30MB."})
+            return
+
+        if self.media_type == self.MediaType.IMAGE:
+            if not self.media_file:
+                raise ValidationError({"media_file": "Debes subir una imagen."})
+            if self.video_url:
+                raise ValidationError({"video_url": "No combines imagen y enlace de video en la misma oferta."})
+            if not any(file_name.endswith(ext) for ext in self.IMAGE_EXTENSIONS):
+                raise ValidationError({"media_file": "Solo se permiten imagenes JPG, JPEG, PNG, WEBP o GIF."})
+            if self.media_file.size > self.MAX_IMAGE_SIZE:
+                raise ValidationError({"media_file": "La imagen no puede superar 8MB."})
+            return
+
+        if self.media_type == self.MediaType.VIDEO:
+            if self.media_file:
+                raise ValidationError({"media_file": "Una oferta de video no debe incluir archivo adjunto."})
+            if not self.video_url:
+                raise ValidationError({"video_url": "Debes agregar el enlace de video."})
+            if not self._video_embed_url():
+                raise ValidationError({"video_url": "El enlace debe ser de YouTube o Google Drive."})
+            return
+
+    def _video_embed_url(self):
+        if not self.video_url:
+            return None
+
+        parsed = urlparse(self.video_url.strip())
+        host = parsed.netloc.lower().replace("www.", "")
+        path_parts = [part for part in parsed.path.split("/") if part]
+        query_params = parse_qs(parsed.query)
+
+        if host in {"youtube.com", "m.youtube.com"}:
+            if parsed.path.startswith("/watch"):
+                video_id = query_params.get("v", [None])[0]
+                if video_id:
+                    return f"https://www.youtube.com/embed/{video_id}"
+            if len(path_parts) >= 2 and path_parts[0] in {"embed", "shorts"}:
+                return f"https://www.youtube.com/embed/{path_parts[1]}"
+
+        if host == "youtu.be" and path_parts:
+            return f"https://www.youtube.com/embed/{path_parts[0]}"
+
+        if host in {"drive.google.com", "docs.google.com"}:
+            file_id = None
+            extra = []
+            if len(path_parts) >= 3 and path_parts[0] == "file" and path_parts[1] == "d":
+                file_id = path_parts[2]
+            if not file_id:
+                file_id = query_params.get("id", [None])[0]
+            resource_key = query_params.get("resourcekey", [None])[0]
+            auth_user = query_params.get("authuser", [None])[0]
+            if resource_key:
+                extra.append(f"resourcekey={resource_key}")
+            if auth_user:
+                extra.append(f"authuser={auth_user}")
+            if file_id:
+                suffix = f"?{'&'.join(extra)}" if extra else ""
+                return f"https://drive.google.com/file/d/{file_id}/preview{suffix}"
+
+        return None
+
+    def get_video_embed_url(self, request=None):
+        embed_url = self._video_embed_url()
+        if not embed_url:
+            return None
+
+        parsed = urlparse(embed_url)
+        host = parsed.netloc.lower().replace("www.", "")
+        if host == "youtube.com" and parsed.path.startswith("/embed/") and request is not None:
+            params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            params["origin"] = request.build_absolute_uri("/")[:-1]
+            params["widget_referrer"] = request.build_absolute_uri()
+            query = urlencode(params)
+            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment))
+        return embed_url

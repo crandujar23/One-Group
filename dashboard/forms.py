@@ -2,12 +2,14 @@ from datetime import timedelta
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
+import bleach
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.utils.html import strip_tags
 from django.utils import timezone
 
 from core.models import BusinessUnit
@@ -15,7 +17,9 @@ from core.models import UserProfile
 from crm.models import CallLog
 from crm.models import SalesRep
 from dashboard.models import Appointment
+from dashboard.models import Announcement
 from dashboard.models import CalendarEvent
+from dashboard.models import Offer
 from dashboard.models import ResourceTag
 from dashboard.models import SharedResource
 from dashboard.models import Task
@@ -463,6 +467,146 @@ class SharedResourceForm(forms.ModelForm):
             tag, _ = ResourceTag.objects.get_or_create(name=name)
             tags.append(tag)
         return tags
+
+
+class AnnouncementForm(forms.ModelForm):
+    ALLOWED_MESSAGE_TAGS = [
+        "p",
+        "br",
+        "strong",
+        "em",
+        "u",
+        "ul",
+        "ol",
+        "li",
+        "a",
+    ]
+    ALLOWED_MESSAGE_ATTRIBUTES = {
+        "a": ["href", "target", "rel"],
+    }
+
+    class Meta:
+        model = Announcement
+        fields = ["title", "message", "start_date", "end_date", "media_type", "media_file", "video_url", "is_active"]
+        labels = {
+            "title": "Titulo del anuncio",
+            "message": "Contenido",
+            "start_date": "Fecha de implementacion",
+            "end_date": "Fecha de finalizacion",
+            "media_type": "Tipo de medio",
+            "media_file": "Archivo (PDF o imagen)",
+            "video_url": "Enlace de video",
+            "is_active": "Activo",
+        }
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Nuevo esquema de comisiones"}),
+            "message": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Mensaje del anuncio"}),
+            "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "media_type": forms.Select(attrs={"class": "form-select"}),
+            "media_file": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "video_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        help_texts = {
+            "media_file": "Para PDF (max 30MB) o imagen JPG/PNG/WEBP/GIF (max 8MB).",
+            "video_url": "Proveedores soportados: YouTube y Google Drive.",
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "La fecha de finalizacion debe ser igual o posterior a la de implementacion.")
+        return cleaned_data
+
+    def clean_message(self):
+        raw_message = (self.cleaned_data.get("message") or "").strip()
+        if not raw_message:
+            raise ValidationError("Este campo es obligatorio.")
+
+        cleaned_message = bleach.clean(
+            raw_message,
+            tags=self.ALLOWED_MESSAGE_TAGS,
+            attributes=self.ALLOWED_MESSAGE_ATTRIBUTES,
+            protocols=["http", "https", "mailto"],
+            strip=True,
+        )
+
+        if not strip_tags(cleaned_message).strip():
+            raise ValidationError("El contenido del anuncio no puede estar vacio.")
+
+        return cleaned_message
+
+
+class OfferForm(forms.ModelForm):
+    ALLOWED_MESSAGE_TAGS = AnnouncementForm.ALLOWED_MESSAGE_TAGS
+    ALLOWED_MESSAGE_ATTRIBUTES = AnnouncementForm.ALLOWED_MESSAGE_ATTRIBUTES
+
+    class Meta:
+        model = Offer
+        fields = ["title", "message", "start_date", "end_date", "business_units", "media_type", "media_file", "video_url", "is_active"]
+        labels = {
+            "title": "Titulo de la oferta",
+            "message": "Contenido",
+            "start_date": "Fecha de implementacion",
+            "end_date": "Fecha de finalizacion",
+            "business_units": "Linea Comercial",
+            "media_type": "Tipo de medio",
+            "media_file": "Archivo (PDF o imagen)",
+            "video_url": "Enlace de video",
+            "is_active": "Activo",
+        }
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Oferta especial de la semana"}),
+            "message": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Mensaje de la oferta"}),
+            "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "business_units": forms.CheckboxSelectMultiple(),
+            "media_type": forms.Select(attrs={"class": "form-select"}),
+            "media_file": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "video_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        help_texts = {
+            "media_file": "Para PDF (max 30MB) o imagen JPG/PNG/WEBP/GIF (max 8MB).",
+            "video_url": "Proveedores soportados: YouTube y Google Drive.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["business_units"].queryset = BusinessUnit.objects.filter(is_active=True).order_by("name")
+        self.fields["business_units"].required = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        business_units = cleaned_data.get("business_units")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "La fecha de finalizacion debe ser igual o posterior a la de implementacion.")
+        if not business_units:
+            self.add_error("business_units", "Selecciona al menos un producto para la oferta.")
+        return cleaned_data
+
+    def clean_message(self):
+        raw_message = (self.cleaned_data.get("message") or "").strip()
+        if not raw_message:
+            raise ValidationError("Este campo es obligatorio.")
+
+        cleaned_message = bleach.clean(
+            raw_message,
+            tags=self.ALLOWED_MESSAGE_TAGS,
+            attributes=self.ALLOWED_MESSAGE_ATTRIBUTES,
+            protocols=["http", "https", "mailto"],
+            strip=True,
+        )
+
+        if not strip_tags(cleaned_message).strip():
+            raise ValidationError("El contenido de la oferta no puede estar vacio.")
+
+        return cleaned_message
 
 
 class CalendarEventForm(forms.ModelForm):

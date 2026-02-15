@@ -2,6 +2,8 @@ from dashboard.business_units import BUSINESS_UNIT_PAGES
 from core.models import UserProfile
 from core.models import BusinessUnit
 from crm.models import SalesRep
+from dashboard.models import Announcement
+from django.utils import timezone
 
 
 def _display_name(user, sales_rep):
@@ -122,4 +124,32 @@ def navigation_context(request):
         "is_admin_user": _is_platform_admin(user, profile),
         "is_manager_user": bool(profile and profile.role == UserProfile.Role.MANAGER),
         "is_sales_rep_user": _is_associate(profile, sales_rep),
+    }
+
+
+def announcements_context(request):
+    user = request.user
+    if not user.is_authenticated:
+        return {}
+
+    today = timezone.localdate()
+    active_announcements = Announcement.objects.filter(
+        is_active=True,
+        start_date__lte=today,
+        end_date__gte=today,
+    ).order_by("-start_date", "-created_at")
+
+    announcement_slides = []
+    for announcement in active_announcements:
+        announcement_slides.append(
+            {
+                "announcement": announcement,
+                "video_embed_url": announcement.get_video_embed_url(request)
+                if announcement.media_type == Announcement.MediaType.VIDEO
+                else None,
+            }
+        )
+
+    return {
+        "global_announcement_slides": announcement_slides,
     }
