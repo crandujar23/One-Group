@@ -1,99 +1,169 @@
-{% extends 'base.html' %}
-{% block title %}Resumen de Ventas{% endblock %}
-{% block content %}
-<section class="hero-card p-4 mb-4 reveal">
-    <h1 class="h3 mb-2">Centro de Control de Ventas</h1>
-    {% if sales_rep %}
-    <p class="mb-0 opacity-75">Representante: {{ sales_rep.user.username }} | Nivel: {{ sales_rep.tier|default:'Sin nivel' }}</p>
-    {% else %}
-    <p class="mb-0 opacity-75">Visión consolidada de desempeño comercial.</p>
-    {% endif %}
-</section>
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3 reveal reveal-delay-1">
-        <article class="kpi-card p-3 h-100">
-            <p class="kpi-label">Total Ventas</p>
-            <p class="kpi-value kpi-accent-green" data-count="{{ total_sales|default:0 }}">0</p>
-        </article>
+{% block extra_css %}
+<style>
+.overview-panel { border: 1px solid #e3e8ef; border-radius: .75rem; background: #fff; box-shadow: 0 8px 20px rgba(15, 23, 42, .05); }
+.chip { display:inline-flex; align-items:center; gap:.4rem; border:1px solid #d6dee8; border-radius:999px; padding:.25rem .7rem; background:#f8fbff; font-size:.86rem; }
+.graph-shell { min-height: 620px; position: relative; border: 1px solid #e3e8ef; border-radius: .75rem; background: #fcfdff; }
+.graph-container { min-height: 600px; }
+.graph-state { position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.92); }
+.graph-controls-main { position:absolute; right:14px; top:14px; z-index:5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="overview-panel p-4 mb-3 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h4 mb-1">Visualiza y comparte tu jerarquía</h1>
+            <p class="mb-0 text-muted">{{ subtitle }}</p>
+            <small class="text-muted d-block mt-2">Última generación: {{ last_generated|date:'d M Y, H:i' }}</small>
+        </div>
+        <button id="fitScreenTop" class="btn btn-sm btn-outline-primary" type="button">Ajustar a pantalla</button>
     </div>
-    <div class="col-md-3 reveal reveal-delay-2">
-        <article class="kpi-card p-3 h-100">
-            <p class="kpi-label">Confirmadas</p>
-            <p class="kpi-value kpi-accent-violet" data-count="{{ confirmed_sales|default:0 }}">0</p>
-        </article>
-    </div>
-    <div class="col-md-3 reveal reveal-delay-3">
-        <article class="kpi-card p-3 h-100">
-            <p class="kpi-label">Puntos</p>
-            <p class="kpi-value kpi-accent-green" data-count="{{ total_points|default:0|floatformat:0 }}">0</p>
-        </article>
-    </div>
-    <div class="col-md-3 reveal reveal-delay-4">
-        <article class="kpi-card p-3 h-100">
-            <p class="kpi-label">Puntos Gastados</p>
-            <p class="kpi-value kpi-accent-violet" data-count="{{ points_spent|default:0|floatformat:0 }}">0</p>
-        </article>
-    </div>
-</div>
+</section>
 
 {% include "dashboard/_announcements_carousel.html" %}
 
-<div class="row g-3 mb-4">
-    <div class="col-lg-5 reveal reveal-delay-1">
-        <section class="chart-card p-3 h-100">
-            <h2 class="h6 mb-2">Distribución por estado</h2>
-            <canvas data-chart="donut" data-source="sales-status-data" width="360" height="240"></canvas>
-            <div class="chart-legend">
-                {% for item in sales_status_chart %}
-                <span><i style="background: {{ item.color }};"></i>{{ item.label }} ({{ item.value }})</span>
-                {% endfor %}
-            </div>
-        </section>
-    </div>
-    <div class="col-lg-7 reveal reveal-delay-2">
-        <section class="chart-card p-3 h-100">
-            <h2 class="h6 mb-2">Ventas últimos 7 días</h2>
-            <canvas data-chart="bars" data-source="sales-daily-data" width="540" height="240"></canvas>
-        </section>
-    </div>
-</div>
-
-<section class="section-card p-3 reveal reveal-delay-2">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="h5 mb-0">Ventas recientes</h2>
-        <span class="text-muted small">Monto acumulado: ${{ total_amount }}</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-modern table-hover mb-0">
-            <thead><tr><th>ID</th><th>Producto</th><th>Plan</th><th>Estado</th><th>Monto</th></tr></thead>
-            <tbody>
-            {% for sale in recent_sales %}
-                <tr>
-                    <td><a href="{% url 'dashboard:sales_detail' sale.id %}">#{{ sale.id }}</a></td>
-                    <td>{{ sale.product.name }}</td>
-                    <td>{{ sale.plan.name }}</td>
-                    <td>
-                        {% if sale.status == "CONFIRMED" %}
-                            <span class="status-pill status-confirmed">{{ sale.get_status_display }}</span>
-                        {% elif sale.status == "PENDING" %}
-                            <span class="status-pill status-pending">{{ sale.get_status_display }}</span>
-                        {% elif sale.status == "CANCELLED" %}
-                            <span class="status-pill status-cancelled">{{ sale.get_status_display }}</span>
-                        {% else %}
-                            <span class="status-pill status-default">{{ sale.get_status_display }}</span>
-                        {% endif %}
-                    </td>
-                    <td>${{ sale.amount }}</td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="5" class="text-center text-muted py-4">Sin ventas registradas.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+<section class="overview-panel p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-3">Distribución por nivel</h2>
+    <div class="d-flex flex-wrap gap-2">
+        {% for item in level_breakdown %}
+        <span class="chip">{{ item.name }} <span class="text-muted">{{ item.count }} ({{ item.percentage }}%)</span></span>
+        {% empty %}
+        <span class="text-muted">Sin distribución disponible.</span>
+        {% endfor %}
     </div>
 </section>
 
-{{ sales_status_chart|json_script:"sales-status-data" }}
-{{ daily_sales_chart|json_script:"sales-daily-data" }}
+<section class="overview-panel p-3 mb-3 reveal reveal-delay-1">
+    <div class="row g-2">
+        <div class="col-6 col-md-3"><div class="p-2 rounded bg-light border"><small class="text-muted d-block">Integrantes</small><strong>{{ team_totals.total }}</strong></div></div>
+        <div class="col-6 col-md-3"><div class="p-2 rounded bg-light border"><small class="text-muted d-block">Directos</small><strong>{{ team_totals.direct_reports }}</strong></div></div>
+        <div class="col-6 col-md-3"><div class="p-2 rounded bg-light border"><small class="text-muted d-block">Niveles</small><strong>{{ team_totals.levels }}</strong></div></div>
+        <div class="col-6 col-md-3"><div class="p-2 rounded bg-light border"><small class="text-muted d-block">Profundidad</small><strong>{{ team_totals.depth }}</strong></div></div>
+    </div>
+</section>
+
+<section class="overview-panel p-3 reveal reveal-delay-2">
+    <div class="graph-shell">
+        <div class="graph-controls-main btn-group btn-group-sm" role="group">
+            <button id="zoomIn" class="btn btn-outline-secondary" type="button">+</button>
+            <button id="zoomOut" class="btn btn-outline-secondary" type="button">-</button>
+            <button id="fitScreenInline" class="btn btn-outline-primary" type="button">⤢</button>
+        </div>
+
+        <div id="graphLoading" class="graph-state {% if graph_error_message %}d-none{% endif %}">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mb-0 mt-2">Construyendo jerarquía...</p>
+            </div>
+        </div>
+
+        <div id="graphError" class="alert alert-danger m-3 {% if not graph_error_message %}d-none{% endif %}">{{ graph_error_message }}</div>
+        <div id="graphEmpty" class="alert alert-secondary m-3 d-none">No hay nodos para renderizar.</div>
+        <div id="hierarchyGraph" class="graph-container"></div>
+    </div>
+</section>
+
+{{ swal_messages|json_script:"swal-messages" }}
+<script id="sales-overview-graph-config" type="application/json">{
+  "sourceUrl": "{{ chart_source_url }}"
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-org-chart@2.6.0"></script>
+<script>
+(function () {
+    const cfgNode = document.getElementById('sales-overview-graph-config');
+    const loading = document.getElementById('graphLoading');
+    const errorNode = document.getElementById('graphError');
+    const emptyNode = document.getElementById('graphEmpty');
+    if (!cfgNode || !window.d3 || !window.d3.OrgChart) return;
+
+    const cfg = JSON.parse(cfgNode.textContent || '{}');
+    if (!cfg.sourceUrl) {
+        if (loading) loading.classList.add('d-none');
+        if (errorNode && errorNode.classList.contains('d-none')) {
+            errorNode.classList.remove('d-none');
+            errorNode.textContent = 'No hay origen de datos para este usuario.';
+        }
+        return;
+    }
+
+    let chart = null;
+
+    function hideLoading() { if (loading) loading.classList.add('d-none'); }
+    function showEmpty() { hideLoading(); if (emptyNode) emptyNode.classList.remove('d-none'); }
+    function showError(msg) { hideLoading(); if (errorNode) { errorNode.classList.remove('d-none'); errorNode.textContent = msg || 'Error cargando el gráfico.'; } }
+
+    function debounce(fn, ms) {
+        let t;
+        return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+    }
+
+    d3.csv(cfg.sourceUrl).then(function (rows) {
+        if (!rows || !rows.length) { showEmpty(); return; }
+
+        rows.forEach(function (row) {
+            row.parentId = row.parentId || null;
+            row.isLoggedUser = String(row.isLoggedUser).toLowerCase() === 'true';
+        });
+
+        chart = new d3.OrgChart()
+            .container('#hierarchyGraph')
+            .data(rows)
+            .nodeHeight(function () { return 74; })
+            .nodeWidth(function (d) { return d.depth === 0 ? 340 : 250; })
+            .childrenMargin(function () { return 44; })
+            .compactMarginBetween(function () { return 24; })
+            .compactMarginPair(function () { return 72; })
+            .buttonContent(function ({ node }) {
+                return '<div style="font-size:11px">' + (node.data._directSubordinates || 0) + '<br/>directos</div>';
+            })
+            .nodeContent(function (d) {
+                const data = d.data;
+                const border = data.isLoggedUser ? '2px solid #0d6efd' : '1px solid #dde3eb';
+                const posBg = d.depth === 0 ? '#0f8a8d' : '#3f3f46';
+                return '<div style="height:100%;padding:8px;border-radius:999px;background:' + posBg + ';border:' + border + ';display:flex;align-items:center;gap:8px;color:#fff;box-shadow:0 6px 14px rgba(2,6,23,.15)">' +
+                    '<img src="' + data.imageUrl + '" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.65)" alt="avatar" />' +
+                    '<div style="line-height:1.2"><div style="font-weight:700;font-size:13px">' + (data.name || '') + '</div><div style="font-size:11px;opacity:.9">' + (data.positionName || '') + '</div></div>' +
+                    '</div>';
+            })
+            .render();
+
+        hideLoading();
+        setTimeout(function () { if (chart) chart.fit(); }, 90);
+
+        const refit = debounce(function () { if (chart) chart.fit(); }, 150);
+        window.addEventListener('resize', refit);
+
+        ['fitScreenTop', 'fitScreenInline'].forEach(function (id) {
+            const btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', function () { if (chart) chart.fit(); });
+        });
+        const zIn = document.getElementById('zoomIn');
+        if (zIn) zIn.addEventListener('click', function () { if (chart) chart.zoomIn(); });
+        const zOut = document.getElementById('zoomOut');
+        if (zOut) zOut.addEventListener('click', function () { if (chart) chart.zoomOut(); });
+    }).catch(function (err) {
+        showError(err && err.message ? err.message : 'No se pudo cargar la jerarquía.');
+    });
+
+    const messagesNode = document.getElementById('swal-messages');
+    if (messagesNode && window.Swal) {
+        let payload = [];
+        try { payload = JSON.parse(messagesNode.textContent || '[]'); } catch (e) {}
+        payload.forEach(function (item) {
+            const isError = (item.tags || '').indexOf('error') >= 0;
+            window.Swal.fire({ icon: isError ? 'error' : 'success', title: 'Notificación', text: item.message, timer: isError ? undefined : 1500, showConfirmButton: isError });
+        });
+    }
+})();
+</script>
 {% endblock %}

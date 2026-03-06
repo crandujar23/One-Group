@@ -96,6 +96,92 @@ class Appointment(models.Model):
         return f"{self.subject} - {self.contact_name}"
 
 
+class OperationsAdminInviteRequest(models.Model):
+    class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        EXPIRED = "expired", "Expired"
+
+    invited_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="operations_admin_invites_received",
+    )
+    inviter_partner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="operations_admin_invites_sent",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    expires_at = models.DateTimeField()
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="operations_admin_invites_reviewed",
+    )
+    review_notes = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.invited_user} <- {self.inviter_partner} [{self.status}]"
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
+
+class AdminInviteRequest(models.Model):
+    class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        EXPIRED = "expired", "Expired"
+
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+    inviter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="admin_invites_sent",
+    )
+    invited_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_invites_received",
+    )
+    level = models.ForeignKey(
+        "core.Role",
+        on_delete=models.PROTECT,
+        related_name="admin_invites",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INVITED, db_index=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.inviter} -> {self.level.code} [{self.status}]"
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
+
 class SharedResource(models.Model):
     class ResourceType(models.TextChoices):
         FILE = "file", "Archivo"

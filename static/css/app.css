@@ -204,6 +204,19 @@ html[data-theme="dark"] .dropdown-item:focus {
     top: -100px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.16);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.hero-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-back-btn {
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
 }
 
 .associate-avatar {
@@ -653,6 +666,22 @@ html[data-theme="dark"] .tools-iframe-wrap {
     color: #fff;
 }
 
+.dt-buttons .btn {
+    margin-right: 0.35rem;
+}
+
+div.dataTables_wrapper div.dataTables_filter input {
+    margin-left: 0.4rem;
+}
+
+#team-table td a {
+    text-decoration: none;
+}
+
+#team-table td a:hover {
+    text-decoration: underline;
+}
+
 .tools-metric-label {
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -782,5 +811,139 @@ html[data-theme="dark"] .announcement-banner {
     .announcement-rich-editor {
         min-height: 140px;
         max-height: 220px;
+    }
+}
+
+.invite-signup-shell {
+    max-width: 440px;
+    position: relative;
+}
+
+.invite-signup-band {
+    height: 142px;
+    border-radius: 10px 10px 0 0;
+    background: #d59b08;
+}
+
+.invite-signup-card {
+    margin-top: -114px;
+    background: #f3f5f7;
+    border-radius: 8px;
+    border: 1px solid #d9e0e8;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+    padding: 1.7rem 1.5rem;
+}
+
+.invite-signup-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1f4f92;
+    margin-bottom: 0.5rem;
+}
+
+.invite-signup-subtitle {
+    color: #77869a;
+    font-size: 1.15rem;
+}
+
+.invite-signup-card .form-label {
+    font-weight: 700;
+    color: #343d4a;
+    font-size: 1.23rem;
+}
+
+.invite-signup-card .form-control {
+    min-height: 54px;
+    border-color: #c2ccd9;
+    background: #f7f9fb;
+    font-size: 1.14rem;
+    color: #475467;
+}
+
+.invite-signup-card .form-control:focus {
+    border-color: #97b8df;
+    box-shadow: 0 0 0 0.2rem rgba(33, 79, 145, 0.14);
+}
+
+.invite-password-rules {
+    color: #758294;
+    font-size: 1.04rem;
+    padding-left: 0.9rem;
+}
+
+.invite-inline-alert {
+    border-color: #f0c073;
+    color: #9b6614;
+    background: #fff6e9;
+    font-size: 1.08rem;
+}
+
+.invite-alert-icon {
+    font-size: 1.1rem;
+    margin-top: 0.1rem;
+}
+
+.invite-signup-submit {
+    background: #67c5a1;
+    border: 0;
+    color: #fff;
+    font-weight: 700;
+    min-height: 50px;
+    font-size: 1.2rem;
+}
+
+.invite-signup-submit:hover {
+    background: #57b58f;
+    color: #fff;
+}
+
+.invite-password-toggle {
+    border-color: #c2ccd9;
+    background: #f7f9fb;
+    color: #7a879a;
+}
+
+.invite-register-body {
+    background: #eceff3;
+}
+
+.invite-register-main {
+    min-height: 100vh;
+    padding: 0 0.6rem 1.2rem;
+}
+
+@media (max-width: 576px) {
+    .invite-signup-band {
+        height: 124px;
+    }
+
+    .invite-signup-card {
+        margin-top: -96px;
+        padding: 1.2rem 0.9rem;
+    }
+
+    .invite-signup-title {
+        font-size: 1.5rem;
+    }
+
+    .invite-signup-subtitle {
+        font-size: 1rem;
+    }
+
+    .invite-signup-card .form-label {
+        font-size: 1.02rem;
+    }
+
+    .invite-signup-card .form-control {
+        min-height: 46px;
+        font-size: 1rem;
+    }
+
+    .invite-password-rules {
+        font-size: 0.91rem;
+    }
+
+    .invite-signup-submit {
+        font-size: 1.02rem;
     }
 }

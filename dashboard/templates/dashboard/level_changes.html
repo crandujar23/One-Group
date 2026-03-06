@@ -1,0 +1,41 @@
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-2">{{ title }}</h1>
+            <p class="mb-0 opacity-75">{{ subtitle }}</p>
+        </div>
+        <a class="btn btn-light btn-sm fw-semibold border shadow-sm hero-back-btn" href="{% url 'dashboard:my_team' %}">
+            ← Volver
+        </a>
+    </div>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <span class="badge text-bg-primary">{{ total_changes }} cambios</span>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-2">
+    <div class="table-responsive">
+        <table class="table table-modern table-striped align-middle mb-0">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Antes</th><th>Despues</th><th>Actor</th><th>Motivo</th></tr></thead>
+            <tbody>
+                {% for item in changes %}
+                <tr>
+                    <td>{{ item.created_at|date:'Y-m-d H:i' }}</td>
+                    <td>{{ item.target.username }}</td>
+                    <td>{{ item.get_previous_role_display }}</td>
+                    <td>{{ item.get_new_role_display }}</td>
+                    <td>{{ item.actor.username|default:'Sistema' }}</td>
+                    <td>{{ item.reason|default:'-' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Sin cambios registrados para tu alcance.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -3,6 +3,7 @@ from django.contrib import admin
 from dashboard.models import Appointment
 from dashboard.models import Announcement
 from dashboard.models import CalendarEvent
+from dashboard.models import OperationsAdminInviteRequest
 from dashboard.models import Offer
 from dashboard.models import ResourceTag
 from dashboard.models import SharedResource
@@ -56,3 +57,10 @@ class OfferAdmin(admin.ModelAdmin):
     list_display = ("title", "media_type", "start_date", "end_date", "is_active", "created_by", "created_at")
     list_filter = ("media_type", "is_active", "start_date", "end_date", "created_by")
     search_fields = ("title", "message", "video_url")
+
+
+@admin.register(OperationsAdminInviteRequest)
+class OperationsAdminInviteRequestAdmin(admin.ModelAdmin):
+    list_display = ("invited_user", "inviter_partner", "status", "expires_at", "reviewed_by", "reviewed_at", "created_at")
+    list_filter = ("status", "inviter_partner", "reviewed_by")
+    search_fields = ("invited_user__username", "invited_user__email", "inviter_partner__username")

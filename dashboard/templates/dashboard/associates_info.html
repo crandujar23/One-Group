@@ -1,0 +1,260 @@
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<style>
+.team-level-chip {
+    display: inline-block;
+    margin-top: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.45rem;
+    line-height: 1.1;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Mi Equipo Comercial</h1>
+            <p class="mb-0 opacity-75">{{ subtitle }}</p>
+        </div>
+        <a id="back-to-my-team" class="btn btn-light btn-sm fw-semibold border shadow-sm hero-back-btn" href="{% url 'dashboard:my_team' %}">
+            ← Volver
+        </a>
+    </div>
+</section>
+
+<section class="row g-3 mb-4 reveal reveal-delay-1">
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Integrantes en tu red</p>
+            <p class="kpi-value" data-count="{{ team_totals.total }}">0</p>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Contactabilidad completa</p>
+            <p class="kpi-value kpi-accent-green">{{ team_totals.contactable_pct }}%</p>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ team_totals.contactable_pct|floatformat:0 }}">
+                <div class="progress-bar bg-success" style="width: {{ team_totals.contactable_pct }}%"></div>
+            </div>
+            <small class="text-muted">{{ team_totals.fully_contactable }} de {{ team_totals.total }} con telefono y correo</small>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Distribucion por nivel</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% for level in level_breakdown|slice:":6" %}
+                <span class="badge text-bg-light border">{{ level.name }}: {{ level.count }}</span>
+                {% empty %}
+                <span class="text-muted">Sin datos.</span>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-2">
+    <form id="team-personal-filters" class="row g-2 align-items-end" autocomplete="off">
+        <div class="col-12 col-lg-3">
+            <label for="filter-level" class="form-label mb-1">Nivel</label>
+            <select id="filter-level" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for level in level_breakdown %}
+                <option value="{{ level.name }}">{{ level.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-3">
+            <label for="filter-city" class="form-label mb-1">Ciudad</label>
+            <select id="filter-city" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                {% for city in cities %}
+                <option value="{{ city }}">{{ city }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-4">
+            <label for="filter-search" class="form-label mb-1">Busqueda global</label>
+            <input id="filter-search" type="search" class="form-control form-control-sm" placeholder="Nombre, telefono o correo">
+        </div>
+        <div class="col-12 col-lg-2 d-grid">
+            <button id="btn-reset-filters" type="button" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
+        </div>
+    </form>
+    <div class="mt-2">
+        <small id="visible-counter" class="text-muted">Mostrando 0 registros</small>
+    </div>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <div class="table-responsive">
+        <table id="team-personal-table" class="table table-modern table-striped align-middle w-100">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Telefono</th>
+                    <th>Email Corporativo</th>
+                    <th>Email Personal</th>
+                    <th>Nivel</th>
+                    <th>Ciudad</th>
+                    <th>Patrocinador</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</section>
+
+{{ swal_messages|json_script:"swal-messages" }}
+<script id="team-personal-config" type="application/json">{
+    "apiUrl": "{{ api_url }}"
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+    const configNode = document.getElementById('team-personal-config');
+    const levelFilter = document.getElementById('filter-level');
+    const cityFilter = document.getElementById('filter-city');
+    const searchFilter = document.getElementById('filter-search');
+    const resetButton = document.getElementById('btn-reset-filters');
+    const counterNode = document.getElementById('visible-counter');
+    if (!configNode || !window.jQuery || !window.jQuery.fn.DataTable) return;
+
+    const config = JSON.parse(configNode.textContent || '{}');
+
+    function escRegExp(value) {
+        return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function renderName(data, type, row) {
+        if (type !== 'display') return data;
+        const safeName = data || 'Sin dato';
+        const level = (row.level_name || '').trim() || 'Sin nivel';
+        return '<div class="fw-semibold">' + safeName + '</div><span class="team-level-chip">' + level + '</span>';
+    }
+
+    function renderLink(prefix, value) {
+        const val = value || '';
+        if (!val || val === 'Sin dato') return 'Sin dato';
+        return '<a href="' + prefix + val + '">' + val + '</a>';
+    }
+
+    const table = window.jQuery('#team-personal-table').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: config.apiUrl,
+            type: 'GET',
+            dataSrc: 'data',
+            data: function (d) {
+                d.level = levelFilter.value;
+                d.city = cityFilter.value;
+            }
+        },
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100, -1], [25, 50, 100, 'Todos']],
+        dom: "<'row g-2 mb-2'<'col-12 col-lg-7'B><'col-12 col-lg-5 text-lg-end'f>>" +
+             "<'row'<'col-12'tr>>" +
+             "<'row mt-2'<'col-12 col-md-5'i><'col-12 col-md-7'p>>",
+        buttons: [
+            { extend: 'copy', className: 'btn btn-sm btn-warning text-dark' },
+            { extend: 'excel', className: 'btn btn-sm btn-warning text-dark' },
+            { extend: 'print', className: 'btn btn-sm btn-warning text-dark' }
+        ],
+        columns: [
+            { data: 'full_name', render: renderName },
+            { data: 'phone', render: function (d, t) { return t === 'display' ? renderLink('tel:', d) : d; } },
+            { data: 'corporate_email', render: function (d, t) { return t === 'display' ? renderLink('mailto:', d) : d; } },
+            { data: 'personal_email', render: function (d, t) { return t === 'display' ? renderLink('mailto:', d) : d; } },
+            { data: 'level_name', defaultContent: 'Sin nivel' },
+            { data: 'city', defaultContent: 'Sin ciudad' },
+            { data: 'sponsor', defaultContent: 'Sin patrocinador' }
+        ],
+        language: {
+            processing: 'Cargando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_ registros',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ registros',
+            infoEmpty: 'Mostrando 0 a 0 de 0 registros',
+            zeroRecords: 'No se encontraron resultados',
+            paginate: { previous: 'Anterior', next: 'Siguiente' }
+        }
+    });
+
+    function updateCounter() {
+        const info = table.page.info();
+        counterNode.textContent = 'Mostrando ' + (info.recordsDisplay || 0) + ' registros';
+    }
+
+    window.jQuery('#team-personal-table').on('init.dt draw.dt', updateCounter);
+
+    levelFilter.addEventListener('change', function () {
+        const val = levelFilter.value;
+        table.column(4).search(val ? '^' + escRegExp(val) + '$' : '', true, false).draw();
+    });
+
+    cityFilter.addEventListener('change', function () {
+        const val = cityFilter.value;
+        table.column(5).search(val ? '^' + escRegExp(val) + '$' : '', true, false).draw();
+    });
+
+    searchFilter.addEventListener('input', function () {
+        table.search(searchFilter.value || '').draw();
+    });
+
+    resetButton.addEventListener('click', function () {
+        levelFilter.value = '';
+        cityFilter.value = '';
+        searchFilter.value = '';
+        table.search('');
+        table.column(4).search('');
+        table.column(5).search('');
+        table.draw();
+    });
+
+    const messagesNode = document.getElementById('swal-messages');
+    if (messagesNode && window.Swal) {
+        let payload = [];
+        try { payload = JSON.parse(messagesNode.textContent || '[]'); } catch (err) { payload = []; }
+        payload.forEach(function (item) {
+            const isError = item.tags && item.tags.indexOf('error') >= 0;
+            window.Swal.fire({
+                icon: isError ? 'error' : 'success',
+                title: isError ? 'Error' : 'Exito',
+                text: item.message,
+                timer: isError ? undefined : 1500,
+                showConfirmButton: isError,
+            });
+        });
+    }
+
+    const backBtn = document.getElementById('back-to-my-team');
+    if (backBtn) {
+        backBtn.addEventListener('click', function () {
+            window.location.assign(backBtn.getAttribute('href'));
+        });
+    }
+})();
+</script>
+{% endblock %}

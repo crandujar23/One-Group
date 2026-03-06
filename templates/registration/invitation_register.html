@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<section class="invite-signup-shell mx-auto py-3 py-md-4">
+    <div class="invite-signup-band" aria-hidden="true"></div>
+    <article class="invite-signup-card">
+        <header class="text-center mb-4">
+            <h1 class="invite-signup-title">Crear una nueva cuenta</h1>
+            {% if token_error %}
+            <p class="invite-signup-subtitle text-danger mb-0">{{ token_error }}</p>
+            {% else %}
+            <p class="invite-signup-subtitle mb-0">Invitado por {{ inviter_name }} para registrarse como un {{ invited_level_label }}</p>
+            {% endif %}
+        </header>
+
+        {% if not token_error %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-warning invite-inline-alert" role="alert">
+                <div class="fw-semibold">Alerta</div>
+                {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.email.id_for_label }}">Email*</label>
+                {{ form.email }}
+                <div class="form-text">Usaremos este correo como tu usuario y para comunicaciones.</div>
+                {% for error in form.email.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.first_name.id_for_label }}">Nombre*</label>
+                {{ form.first_name }}
+                {% for error in form.first_name.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.last_name.id_for_label }}">Apellido*</label>
+                {{ form.last_name }}
+                {% for error in form.last_name.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.second_last_name.id_for_label }}">Segundo Apellido*</label>
+                {{ form.second_last_name }}
+                {% for error in form.second_last_name.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.password1.id_for_label }}">Contraseña*</label>
+                <div class="input-group">
+                    {{ form.password1 }}
+                    <button class="btn btn-outline-secondary invite-password-toggle" type="button" data-target="{{ form.password1.id_for_label }}" aria-label="Mostrar u ocultar contraseña">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% for error in form.password1.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <ul class="invite-password-rules mb-3">
+                {% for rule in password_rules %}
+                <li>{{ rule }}</li>
+                {% endfor %}
+            </ul>
+
+            <div class="mb-4">
+                <label class="form-label" for="{{ form.password2.id_for_label }}">Confirmar Contraseña*</label>
+                <div class="input-group">
+                    {{ form.password2 }}
+                    <button class="btn btn-outline-secondary invite-password-toggle" type="button" data-target="{{ form.password2.id_for_label }}" aria-label="Mostrar u ocultar contraseña">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% for error in form.password2.errors %}
+                <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            {% if form.password1.errors %}
+            <div class="alert invite-inline-alert mb-3" role="alert">
+                <div class="d-flex gap-2 align-items-start">
+                    <i class="bi bi-exclamation-triangle invite-alert-icon" aria-hidden="true"></i>
+                    <div>
+                        <div class="fw-semibold">Alerta</div>
+                        <div>{{ form.password1.errors.0 }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <button type="submit" class="btn invite-signup-submit w-100">Regístrese</button>
+        </form>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    document.querySelectorAll('.invite-password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const field = document.getElementById(btn.dataset.target);
+            if (!field) return;
+            const icon = btn.querySelector('i');
+            const isPassword = field.type === 'password';
+            field.type = isPassword ? 'text' : 'password';
+            if (icon) {
+                icon.classList.toggle('bi-eye', !isPassword);
+                icon.classList.toggle('bi-eye-slash', isPassword);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

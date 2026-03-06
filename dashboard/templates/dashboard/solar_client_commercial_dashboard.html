@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Cliente Comercial{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-2">Cliente Comercial</h1>
+            <p class="mb-0 opacity-75">Dashboard operativo de clientes comerciales en Solar.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'dashboard:unit_solar' %}">Volver</a>
+    </div>
+</section>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 reveal reveal-delay-1">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Clientes Totales</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ total_clients|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-2">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Con Teléfono</p>
+            <p class="kpi-value" data-count="{{ with_phone|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-3">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Con Email</p>
+            <p class="kpi-value" data-count="{{ with_email|default:0 }}">0</p>
+        </article>
+    </div>
+    <div class="col-md-3 reveal reveal-delay-3">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Contactables</p>
+            <p class="kpi-value kpi-accent-violet">{{ contactable_pct }}%</p>
+        </article>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5 reveal reveal-delay-1">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Distribución por fuente</h2>
+            <canvas data-chart="donut" data-source="commercial-source-data" width="360" height="240"></canvas>
+            <div class="chart-legend">
+                {% for item in lead_source_chart %}
+                <span><i style="background: {{ item.color }};"></i>{{ item.label }} ({{ item.value }})</span>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+    <div class="col-lg-7 reveal reveal-delay-2">
+        <section class="chart-card p-3 h-100">
+            <h2 class="h6 mb-2">Clientes últimos 7 días</h2>
+            <canvas data-chart="bars" data-source="commercial-daily-data" width="540" height="240"></canvas>
+        </section>
+    </div>
+</div>
+
+<section class="section-card p-3 reveal reveal-delay-2">
+    <h2 class="h5 mb-3">Clientes recientes</h2>
+    <div class="table-responsive">
+        <table class="table table-modern table-hover mb-0">
+            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Fuente</th><th>Asociado</th><th>Fecha</th></tr></thead>
+            <tbody>
+            {% for lead in recent_leads %}
+                <tr>
+                    <td>{{ lead.full_name }}</td>
+                    <td>{{ lead.phone|default:"-" }}</td>
+                    <td>{{ lead.email|default:"-" }}</td>
+                    <td>{{ lead.source|default:"Sin fuente" }}</td>
+                    <td>{{ lead.sales_rep.user.get_username|default:"-" }}</td>
+                    <td>{{ lead.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Sin clientes comerciales registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{{ lead_source_chart|json_script:"commercial-source-data" }}
+{{ daily_leads_chart|json_script:"commercial-daily-data" }}
+{% endblock %}

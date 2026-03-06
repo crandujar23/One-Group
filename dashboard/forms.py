@@ -4,18 +4,26 @@ from urllib.parse import urlparse
 
 import bleach
 from django import forms
+from allauth.account.forms import SignupForm
+from django.contrib.auth import password_validation
+from django.contrib.auth.models import Group
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.html import strip_tags
 from django.utils import timezone
 
 from core.models import BusinessUnit
+from core.models import Role
 from core.models import UserProfile
+from core.rbac.constants import ROLES_REQUIRING_BUSINESS_UNITS
 from crm.models import CallLog
 from crm.models import SalesRep
+from rewards.models import Tier
+from dashboard.models import AdminInviteRequest
 from dashboard.models import Appointment
 from dashboard.models import Announcement
 from dashboard.models import CalendarEvent
@@ -90,6 +98,291 @@ class PasswordResetSetForm(SetPasswordForm):
                 "autocomplete": "new-password",
             }
         )
+
+
+class InvitationSignupForm(forms.Form):
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Escribir email actual",
+                "autocomplete": "email",
+            }
+        ),
+    )
+    first_name = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Escribir Nombre",
+                "autocomplete": "given-name",
+            }
+        ),
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Escribir Apellido",
+                "autocomplete": "family-name",
+            }
+        ),
+    )
+    second_last_name = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Escribir Segundo Apellido",
+                "autocomplete": "additional-name",
+            }
+        ),
+    )
+    password1 = forms.CharField(
+        required=True,
+        min_length=8,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Escribir Contraseña",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+    password2 = forms.CharField(
+        required=True,
+        min_length=8,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Confirmar Contraseña",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not email:
+            return email
+        if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Este correo ya está registrado.")
+        return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+        email = cleaned_data.get("email") or ""
+
+        if password1 and password2 and password1 != password2:
+            self.add_error("password2", "Las contraseñas no coinciden.")
+            return cleaned_data
+
+        if password1:
+            candidate_user = User(username=email, email=email)
+            try:
+                password_validation.validate_password(password1, user=candidate_user)
+            except ValidationError as exc:
+                self.add_error("password1", exc)
+        return cleaned_data
+
+
+class InvitedAllauthSignupForm(SignupForm):
+    first_name = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Escribir Nombre", "autocomplete": "given-name"}),
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Escribir Apellido", "autocomplete": "family-name"}),
+    )
+    second_last_name = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Escribir Segundo Apellido", "autocomplete": "additional-name"}),
+    )
+    parent_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    level_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    invite_role = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.update(
+            {
+                "class": "form-control",
+                "placeholder": "Escribir email actual",
+                "autocomplete": "email",
+            }
+        )
+        self.fields["password1"].widget.attrs.update(
+            {
+                "class": "form-control",
+                "placeholder": "Escribir Contraseña",
+                "autocomplete": "new-password",
+            }
+        )
+        self.fields["password2"].widget.attrs.update(
+            {
+                "class": "form-control",
+                "placeholder": "Confirmar Contraseña",
+                "autocomplete": "new-password",
+            }
+        )
+        if "username" in self.fields:
+            self.fields["username"].required = False
+            self.fields["username"].widget = forms.HiddenInput()
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not email:
+            return email
+        if User.objects.filter(username__iexact=email).exists():
+            raise ValidationError("Este correo ya está registrado.")
+        return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        email = (cleaned_data.get("email") or "").strip().lower()
+        if email:
+            cleaned_data["email"] = email
+            cleaned_data["username"] = email
+
+        password1 = cleaned_data.get("password1") or ""
+        password2 = cleaned_data.get("password2") or ""
+        if password1 and password2 and password1 != password2 and "password2" not in self.errors:
+            self.add_error("password2", "Las contraseñas no coinciden.")
+
+        if password1 and "password1" not in self.errors:
+            candidate_user = User(
+                username=email or "",
+                email=email or "",
+                first_name=cleaned_data.get("first_name") or "",
+                last_name=cleaned_data.get("last_name") or "",
+            )
+            try:
+                password_validation.validate_password(password1, user=candidate_user)
+            except ValidationError as exc:
+                self.add_error("password1", exc)
+        return cleaned_data
+
+    def save(self, request):
+        with transaction.atomic():
+            user = super().save(request)
+            normalized_email = (self.cleaned_data.get("email") or "").strip().lower()
+            user.username = normalized_email
+            user.email = normalized_email
+            user.first_name = (self.cleaned_data.get("first_name") or "").strip()
+            user.last_name = (self.cleaned_data.get("last_name") or "").strip()
+            user.save(update_fields=["username", "email", "first_name", "last_name"])
+
+            profile = getattr(user, "profile", None)
+            if profile:
+                profile.save()
+
+            inviter_id = self.cleaned_data.get("parent_id")
+            level_id = self.cleaned_data.get("level_id")
+            inviter = User.objects.filter(pk=inviter_id).first() if inviter_id else None
+            level = Role.objects.filter(pk=level_id).first() if level_id else None
+            inviter_profile = getattr(inviter, "profile", None) if inviter else None
+            inviter_rep = SalesRep.objects.filter(user=inviter).select_related("business_unit", "tier").first() if inviter else None
+            invited_role_code = (level.code if level else "").strip()
+
+            resolved_units: list[BusinessUnit] = []
+            if inviter_profile:
+                unit_ids = list(inviter_profile.business_units.values_list("id", flat=True))
+                if unit_ids:
+                    resolved_units = list(BusinessUnit.objects.filter(id__in=unit_ids, is_active=True).order_by("id"))
+                elif inviter_profile.business_unit_id and inviter_profile.business_unit.is_active:
+                    resolved_units = [inviter_profile.business_unit]
+
+            if inviter_rep and inviter_rep.business_unit_id:
+                resolved_primary_unit = inviter_rep.business_unit
+                if not resolved_units:
+                    resolved_units = [inviter_rep.business_unit]
+            else:
+                resolved_primary_unit = resolved_units[0] if resolved_units else BusinessUnit.objects.filter(is_active=True).order_by("id").first()
+                if resolved_primary_unit and not resolved_units:
+                    resolved_units = [resolved_primary_unit]
+
+            resolved_tier = inviter_rep.tier if inviter_rep and inviter_rep.tier_id else Tier.objects.order_by("rank", "name").first()
+
+            profile = getattr(user, "profile", None)
+            if profile:
+                if invited_role_code in dict(UserProfile.Role.choices):
+                    profile.role = invited_role_code
+                if inviter and profile.manager_id != inviter.id:
+                    profile.manager = inviter
+                if invited_role_code in ROLES_REQUIRING_BUSINESS_UNITS:
+                    profile.business_unit = resolved_primary_unit
+                profile.save()
+                if invited_role_code in ROLES_REQUIRING_BUSINESS_UNITS:
+                    profile.business_units.set(resolved_units)
+
+            sales_rep, _ = SalesRep.objects.get_or_create(
+                user=user,
+                defaults={
+                    "business_unit": resolved_primary_unit,
+                    "tier": resolved_tier,
+                    "level": level or Role.objects.filter(code=UserProfile.Role.SOLAR_CONSULTANT).first(),
+                },
+            )
+
+            changed_fields: list[str] = []
+            if level and sales_rep.level_id != level.id:
+                sales_rep.level = level
+                changed_fields.append("level")
+            if inviter_rep and sales_rep.parent_id != inviter_rep.id:
+                sales_rep.parent = inviter_rep
+                changed_fields.append("parent")
+            second_last_name = (self.cleaned_data.get("second_last_name") or "").strip()
+            if sales_rep.second_last_name != second_last_name:
+                sales_rep.second_last_name = second_last_name
+                changed_fields.append("second_last_name")
+            if resolved_primary_unit and sales_rep.business_unit_id != resolved_primary_unit.id:
+                sales_rep.business_unit = resolved_primary_unit
+                changed_fields.append("business_unit")
+            if resolved_tier and sales_rep.tier_id != resolved_tier.id:
+                sales_rep.tier = resolved_tier
+                changed_fields.append("tier")
+            if changed_fields:
+                sales_rep.save(update_fields=changed_fields)
+
+            if hasattr(sales_rep, "update_commission"):
+                sales_rep.update_commission()
+
+            salesreps_group, _ = Group.objects.get_or_create(name="Salesreps")
+            user.groups.add(salesreps_group)
+
+            invite_role = request.session.get("invite_role")
+            invite_request_id = request.session.get("invite_admin_request_id")
+            if invite_role == "admin" and invite_request_id:
+                admin_request = AdminInviteRequest.objects.filter(pk=invite_request_id).first()
+                if admin_request:
+                    admin_request.invited_user = user
+                    admin_request.used_at = timezone.now()
+                    admin_request.status = AdminInviteRequest.Status.PENDING
+                    admin_request.save(update_fields=["invited_user", "used_at", "status", "updated_at"])
+
+            request.session.pop("invite_role", None)
+            request.session.pop("invite_admin_request_id", None)
+            for key in list(request.session.keys()):
+                if key.startswith("preinscripcion_"):
+                    request.session.pop(key, None)
+            request.session.pop("parent_name", None)
+            request.session.pop("level_name", None)
+            request.session.pop("parent_id", None)
+            request.session.pop("level_id", None)
+
+            return user
 
 
 class UserProfileForm(forms.ModelForm):
@@ -342,10 +635,8 @@ class AccessManagementCreateForm(forms.Form):
         role = cleaned_data.get("role")
         business_units = cleaned_data.get("business_units")
         units_count = len(business_units) if business_units is not None else 0
-        if role == UserProfile.Role.MANAGER and units_count == 0:
+        if role in ROLES_REQUIRING_BUSINESS_UNITS and units_count == 0:
             self.add_error("business_units", "Este rol requiere al menos una unidad de negocio.")
-        if role == UserProfile.Role.SALES_REP and units_count == 0:
-            self.add_error("business_units", "Asociado requiere al menos una unidad de negocio.")
         return cleaned_data
 
 
@@ -375,10 +666,8 @@ class AccessManagementAssignForm(forms.Form):
         role = cleaned_data.get("role")
         business_units = cleaned_data.get("business_units")
         units_count = len(business_units) if business_units is not None else 0
-        if role == UserProfile.Role.MANAGER and units_count == 0:
+        if role in ROLES_REQUIRING_BUSINESS_UNITS and units_count == 0:
             self.add_error("business_units", "Este rol requiere al menos una unidad de negocio.")
-        if role == UserProfile.Role.SALES_REP and units_count == 0:
-            self.add_error("business_units", "Asociado requiere al menos una unidad de negocio.")
         return cleaned_data
 
 
@@ -693,3 +982,5 @@ class AppointmentForm(forms.ModelForm):
         if start_at and end_at and end_at <= start_at:
             self.add_error("end_at", "La hora final debe ser posterior al inicio.")
         return cleaned_data
+
+

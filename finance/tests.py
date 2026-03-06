@@ -6,6 +6,7 @@ from django.test import TestCase
 from core.models import BusinessUnit
 from crm.models import Sale, SalesRep
 from finance.models import Commission
+from finance.models import CommissionAllocation
 from inventory.models import Product
 from rewards.models import CompensationPlan, PlanTierRule, RewardPoint, Tier
 
@@ -44,17 +45,22 @@ class CompensationFlowTests(TestCase):
         )
 
         self.assertEqual(Commission.objects.count(), 1)
+        self.assertEqual(CommissionAllocation.objects.count(), 1)
         self.assertEqual(RewardPoint.objects.count(), 1)
 
         sale.status = Sale.Status.CONFIRMED
         sale.save()
 
         self.assertEqual(Commission.objects.count(), 1)
+        self.assertEqual(CommissionAllocation.objects.count(), 1)
         self.assertEqual(RewardPoint.objects.count(), 1)
 
         commission = Commission.objects.get(sale=sale)
+        allocation = CommissionAllocation.objects.get(sale=sale, sales_rep=self.rep)
         points = RewardPoint.objects.get(sale=sale)
-        self.assertEqual(commission.commission_amount, Decimal("100.00"))
+        self.assertEqual(commission.commission_amount, Decimal("60.00"))
         self.assertEqual(commission.bonus_amount, Decimal("20.00"))
-        self.assertEqual(commission.total_amount, Decimal("120.00"))
+        self.assertEqual(commission.total_amount, Decimal("80.00"))
+        self.assertEqual(allocation.share_percent, Decimal("0.0600"))
+        self.assertEqual(allocation.amount, Decimal("60.00"))
         self.assertEqual(points.points, Decimal("100.00"))

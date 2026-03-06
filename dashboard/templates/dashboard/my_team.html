@@ -1,0 +1,298 @@
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+{% endblock %}
+
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">{{ title }}</h1>
+    <p class="mb-0 opacity-75">{{ subtitle }}</p>
+</section>
+
+<section class="section-card p-3 mb-4 reveal reveal-delay-1">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 mb-0">Accesos rapidos del equipo</h2>
+    </div>
+    <div class="row g-2">
+        <div class="col-12 col-md-6 col-lg-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'dashboard:associates_info' %}">Informacion de Asociados</a>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'dashboard:apps_crm_salesteam_graph' %}">Jerarquia de Ventas</a>
+        </div>
+        {% if can_view_commission_structure %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'dashboard:commission_structure' %}">Estructura de Comisiones</a>
+        </div>
+        {% endif %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'dashboard:grow_team' %}">Crece tu Equipo</a>
+        </div>
+        {% if can_view_level_changes %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'dashboard:level_changes' %}">Cambios de Nivel</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="row g-3 mb-4 reveal reveal-delay-2">
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Total del equipo</p>
+            <p class="kpi-value" data-count="{{ kpis.total }}">0</p>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Contactables</p>
+            <p class="kpi-value kpi-accent-green" data-count="{{ kpis.contactables }}">0</p>
+            <small class="text-muted">{{ kpis.contactabilidad }}% de contactabilidad</small>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="kpi-card p-3 h-100">
+            <p class="kpi-label">Distribución por nivel</p>
+            {% if kpis.breakdown %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for item in kpis.breakdown %}
+                    <span class="badge text-bg-light border">{{ item.nivel }}: {{ item.total }}</span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="mb-0 text-muted">Sin información disponible.</p>
+            {% endif %}
+        </article>
+    </div>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-2">
+    <form id="team-filters" class="row g-2 align-items-end" autocomplete="off">
+        <div class="col-12 col-lg-3">
+            <label for="filter-level" class="form-label mb-1">Nivel</label>
+            <select id="filter-level" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for item in kpis.breakdown %}
+                <option value="{{ item.nivel }}">{{ item.nivel }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-3">
+            <label for="filter-city" class="form-label mb-1">Ciudad</label>
+            <select id="filter-city" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                {% for city in cities %}
+                <option value="{{ city }}">{{ city }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-lg-4">
+            <label for="filter-search" class="form-label mb-1">Búsqueda global</label>
+            <input id="filter-search" type="search" class="form-control form-control-sm" placeholder="Nombre, correo, ciudad, nivel...">
+        </div>
+        <div class="col-12 col-lg-2 d-grid">
+            <button id="btn-reset-filters" type="button" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
+        </div>
+    </form>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h2 class="h6 mb-0">Listado del equipo</h2>
+        <span id="visible-counter" class="badge text-bg-primary">0 visibles</span>
+    </div>
+    <div class="table-responsive">
+        <table id="team-table" class="table table-modern table-striped align-middle w-100">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Usuario</th>
+                    <th>Nivel</th>
+                    <th>Ciudad</th>
+                    <th>Unidad</th>
+                    <th>Contacto</th>
+                    <th>Estado</th>
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Ingreso</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</section>
+
+{{ swal_messages|json_script:"swal-messages" }}
+<script id="my-team-config" type="application/json">{
+    "apiUrl": "{{ api_url }}",
+    "csrfToken": "{{ csrf_token }}"
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+    const configNode = document.getElementById('my-team-config');
+    const counterNode = document.getElementById('visible-counter');
+    const filtersForm = document.getElementById('team-filters');
+    const levelFilter = document.getElementById('filter-level');
+    const cityFilter = document.getElementById('filter-city');
+    const searchFilter = document.getElementById('filter-search');
+    const resetButton = document.getElementById('btn-reset-filters');
+
+    if (!configNode || !window.jQuery || !window.jQuery.fn.DataTable) {
+        return;
+    }
+
+    const config = JSON.parse(configNode.textContent || '{}');
+
+    function renderBadge(value, variant) {
+        return '<span class="badge text-bg-' + variant + '">' + value + '</span>';
+    }
+
+    function updateCounter(table) {
+        const info = table.page.info();
+        const visible = info.recordsDisplay || 0;
+        counterNode.textContent = visible.toLocaleString('es-ES') + ' visibles';
+    }
+
+    const table = window.jQuery('#team-table').DataTable({
+        processing: true,
+        serverSide: true,
+        responsive: true,
+        ajax: {
+            url: config.apiUrl,
+            type: 'GET',
+            data: function (d) {
+                d.level = levelFilter.value;
+                d.city = cityFilter.value;
+            },
+        },
+        dom: "<'row g-2 mb-2'<'col-12 col-lg-7'B><'col-12 col-lg-5 text-lg-end'f>>" +
+            "<'row'<'col-12'tr>>" +
+            "<'row mt-2'<'col-12 col-md-5'i><'col-12 col-md-7'p>>",
+        buttons: [
+            { extend: 'copy', className: 'btn btn-sm btn-outline-secondary' },
+            { extend: 'excel', className: 'btn btn-sm btn-outline-success' },
+            { extend: 'print', className: 'btn btn-sm btn-outline-primary' },
+        ],
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50], [10, 25, 50]],
+        language: {
+            processing: 'Cargando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ registros',
+            infoEmpty: 'Sin registros disponibles',
+            zeroRecords: 'No hay resultados para los filtros aplicados',
+            paginate: { previous: 'Anterior', next: 'Siguiente' },
+        },
+        order: [[0, 'asc']],
+        columns: [
+            { data: 'full_name' },
+            { data: 'username' },
+            { data: 'level' },
+            { data: 'city' },
+            { data: 'business_unit' },
+            {
+                data: 'contactability',
+                render: function (data) {
+                    return data === 'Contactable'
+                        ? renderBadge('Contactable', 'success')
+                        : renderBadge('Sin contacto', 'secondary');
+                },
+            },
+            {
+                data: 'status',
+                render: function (data) {
+                    return data === 'Activo'
+                        ? renderBadge('Activo', 'primary')
+                        : renderBadge('Inactivo', 'dark');
+                },
+            },
+            {
+                data: 'phone',
+                render: function (data, type, row) {
+                    if (type !== 'display') return data;
+                    if (!data) return '-';
+                    if (row.phone_raw && row.phone_raw === data) {
+                        return '<a href="tel:' + row.phone_raw + '">' + data + '</a>';
+                    }
+                    return data;
+                },
+            },
+            {
+                data: 'email',
+                render: function (data, type, row) {
+                    if (type !== 'display') return data;
+                    if (!data) return '-';
+                    if (row.email_raw && row.email_raw === data) {
+                        return '<a href="mailto:' + row.email_raw + '">' + data + '</a>';
+                    }
+                    return data;
+                },
+            },
+            {
+                data: 'hire_date',
+                render: function (data) {
+                    if (!data) return '-';
+                    return data;
+                },
+            },
+        ],
+        drawCallback: function () {
+            updateCounter(table);
+        },
+    });
+
+    searchFilter.addEventListener('input', function () {
+        table.search(searchFilter.value || '').draw();
+    });
+
+    levelFilter.addEventListener('change', function () {
+        table.ajax.reload();
+    });
+
+    cityFilter.addEventListener('change', function () {
+        table.ajax.reload();
+    });
+
+    resetButton.addEventListener('click', function () {
+        filtersForm.reset();
+        table.search('').columns().search('');
+        table.ajax.reload();
+    });
+
+    const messagesNode = document.getElementById('swal-messages');
+    if (messagesNode && window.Swal) {
+        let payload = [];
+        try {
+            payload = JSON.parse(messagesNode.textContent || '[]');
+        } catch (err) {
+            payload = [];
+        }
+        payload.forEach(function (item) {
+            const icon = item.tags && item.tags.indexOf('error') >= 0 ? 'error' : 'success';
+            window.Swal.fire({
+                icon: icon,
+                title: 'Notificación',
+                text: item.message,
+                timer: 2600,
+                showConfirmButton: false,
+            });
+        });
+    }
+})();
+</script>
+{% endblock %}

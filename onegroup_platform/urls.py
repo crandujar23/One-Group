@@ -5,13 +5,24 @@ from django.conf.urls.static import static
 from django.urls import include, path
 from django.urls import reverse_lazy
 
+from core.rbac.constants import RoleCode
 from dashboard.forms import PasswordResetRequestForm
 from dashboard.forms import PasswordResetSetForm
 from dashboard.views import OneGroupLoginView
 
 
 def _admin_has_permission(request):
-    return bool(request.user.is_active and request.user.is_superuser)
+    user = request.user
+    if not user.is_active:
+        return False
+    if user.is_superuser:
+        return True
+    if not user.is_staff:
+        return False
+    profile = getattr(user, "profile", None)
+    if profile and profile.role in {RoleCode.PARTNER, RoleCode.ADMINISTRADOR}:
+        return False
+    return True
 
 
 admin.site.has_permission = _admin_has_permission
@@ -19,6 +30,7 @@ admin.site.has_permission = _admin_has_permission
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("", include("core.urls")),
     path("", include("dashboard.urls")),
     path("accounts/login/", OneGroupLoginView.as_view(), name="login"),
     path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
@@ -63,6 +75,7 @@ urlpatterns = [
         auth_views.PasswordChangeDoneView.as_view(template_name="registration/password_change_done.html"),
         name="password_change_done",
     ),
+    path("accounts/", include("allauth.account.urls")),
 ]
 
 if settings.DEBUG:

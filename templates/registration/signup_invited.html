@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Crear nueva cuenta{% endblock %}
+
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Crear una nueva cuenta</h1>
+    {% if invitation_valid %}
+    <p class="mb-0 opacity-75">Invitado por {{ parent_name }} para registrarse como un {{ level_name }}</p>
+    {% else %}
+    <p class="mb-0 text-warning-emphasis">{{ invitation_error }}</p>
+    {% endif %}
+</section>
+
+<section class="section-card p-4 reveal reveal-delay-1">
+    {% if invitation_valid %}
+    {% if invite_role == "admin" %}
+    <div class="alert alert-info mb-3" role="alert">
+        Tu registro será revisado por el Partner antes de activar permisos administrativos.
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate id="invited-signup-form">
+        {% csrf_token %}
+        {{ form.parent_id }}
+        {{ form.level_id }}
+        {{ form.invite_role }}
+        {% if form.username %}{{ form.username }}{% endif %}
+
+        <div id="invited-signup-feedback" class="alert alert-danger d-none" role="alert" aria-live="polite"></div>
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-warning" role="alert">
+            <div class="fw-semibold">Alerta</div>
+            {% for error in form.non_field_errors %}
+            <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label" for="{{ form.email.id_for_label }}">Email*</label>
+                {{ form.email }}
+                <div class="form-text">Usaremos este correo como tu usuario y para comunicaciones.</div>
+                {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="{{ form.first_name.id_for_label }}">Nombre*</label>
+                {{ form.first_name }}
+                {% for error in form.first_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="{{ form.last_name.id_for_label }}">Apellido*</label>
+                {{ form.last_name }}
+                {% for error in form.last_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="{{ form.second_last_name.id_for_label }}">Segundo Apellido</label>
+                {{ form.second_last_name }}
+                {% for error in form.second_last_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label" for="{{ form.password1.id_for_label }}">Contraseña*</label>
+                <div class="input-group">
+                    {{ form.password1 }}
+                    <button class="btn btn-outline-secondary invite-password-toggle" type="button" data-target="{{ form.password1.id_for_label }}" aria-label="Mostrar u ocultar contraseña">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% for error in form.password1.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label" for="{{ form.password2.id_for_label }}">Confirmar Contraseña*</label>
+                <div class="input-group">
+                    {{ form.password2 }}
+                    <button class="btn btn-outline-secondary invite-password-toggle" type="button" data-target="{{ form.password2.id_for_label }}" aria-label="Mostrar u ocultar contraseña">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% for error in form.password2.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <ul class="invite-password-rules mb-3 mt-3" id="password-rules">
+                <li data-rule="len">La contraseña debe tener 8 o más caracteres.</li>
+                <li data-rule="upper">Debe tener al menos 1 carácter en mayúscula.</li>
+                <li data-rule="lower">Debe tener al menos 1 carácter en minúscula.</li>
+                <li data-rule="digit">Debe tener al menos 1 carácter en numérico.</li>
+                <li data-rule="special">Debe tener al menos 1 carácter especial.</li>
+                <li data-rule="sequence">La contraseña no puede tener secuencias como 123 o abc.</li>
+                <li data-rule="match">Las contraseñas deben coincidir.</li>
+        </ul>
+
+        <button type="submit" class="btn btn-primary w-100" id="invited-signup-submit">Registrese</button>
+    </form>
+    {% else %}
+    <div class="alert alert-danger mb-0" role="alert">You must be invited to register.</div>
+    {% endif %}
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    document.querySelectorAll('.invite-password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const field = document.getElementById(btn.dataset.target);
+            if (!field) return;
+            const icon = btn.querySelector('i');
+            const isPassword = field.type === 'password';
+            field.type = isPassword ? 'text' : 'password';
+            if (icon) {
+                icon.classList.toggle('bi-eye', !isPassword);
+                icon.classList.toggle('bi-eye-slash', isPassword);
+            }
+        });
+    });
+
+    const emailInput = document.getElementById('{{ form.email.id_for_label }}');
+    const usernameInput = document.getElementById('id_username');
+    const firstNameInput = document.getElementById('{{ form.first_name.id_for_label }}');
+    const lastNameInput = document.getElementById('{{ form.last_name.id_for_label }}');
+    const pass1 = document.getElementById('{{ form.password1.id_for_label }}');
+    const pass2 = document.getElementById('{{ form.password2.id_for_label }}');
+    const form = document.getElementById('invited-signup-form');
+    const feedback = document.getElementById('invited-signup-feedback');
+    const submitBtn = document.getElementById('invited-signup-submit');
+    if (!pass1 || !pass2 || !submitBtn) return;
+
+    function hasSequence(password) {
+        const text = (password || '').toLowerCase();
+        const sequences = ['012', '123', '234', '345', '456', '567', '678', '789', 'abc', 'bcd', 'cde', 'def', 'efg'];
+        return sequences.some(function (seq) { return text.indexOf(seq) >= 0; });
+    }
+
+    function evaluate(password, confirm) {
+        return {
+            len: (password || '').length >= 8,
+            upper: /[A-Z]/.test(password || ''),
+            lower: /[a-z]/.test(password || ''),
+            digit: /\d/.test(password || ''),
+            special: /[^A-Za-z0-9]/.test(password || ''),
+            sequence: !hasSequence(password || ''),
+            match: (password || '') !== '' && password === confirm,
+        };
+    }
+
+    function paintRules(result) {
+        document.querySelectorAll('#password-rules [data-rule]').forEach(function (item) {
+            const key = item.getAttribute('data-rule');
+            const ok = Boolean(result[key]);
+            item.classList.toggle('text-success', ok);
+            item.classList.toggle('text-danger', !ok && pass1.value.length > 0);
+        });
+    }
+
+    function setFieldState(field, isValid) {
+        if (!field) return;
+        field.classList.toggle('is-invalid', !isValid);
+        field.classList.toggle('is-valid', isValid && field.value.trim().length > 0);
+    }
+
+    function showFeedback(messages) {
+        if (!feedback) return;
+        if (!messages || !messages.length) {
+            feedback.classList.add('d-none');
+            feedback.textContent = '';
+            return;
+        }
+        feedback.classList.remove('d-none');
+        feedback.innerHTML = '<div class="fw-semibold">Corrige lo siguiente:</div><ul class="mb-0 mt-2">' +
+            messages.map(function (message) { return '<li>' + message + '</li>'; }).join('') +
+            '</ul>';
+    }
+
+    function syncUsername() {
+        if (!emailInput || !usernameInput) return;
+        usernameInput.value = (emailInput.value || '').trim().toLowerCase();
+    }
+
+    function validate() {
+        syncUsername();
+        const result = evaluate(pass1.value, pass2.value);
+        paintRules(result);
+        return result;
+    }
+
+    [emailInput, firstNameInput, lastNameInput, pass1, pass2].forEach(function (input) {
+        if (input) {
+            input.addEventListener('input', function () {
+                validate();
+                showFeedback([]);
+            });
+            input.addEventListener('change', function () {
+                validate();
+                showFeedback([]);
+            });
+        }
+    });
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            const result = validate();
+            const errors = [];
+            const emailValue = (emailInput && emailInput.value || '').trim();
+            const firstNameValue = (firstNameInput && firstNameInput.value || '').trim();
+            const lastNameValue = (lastNameInput && lastNameInput.value || '').trim();
+
+            const emailOk = emailValue.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+            const firstNameOk = firstNameValue.length > 0;
+            const lastNameOk = lastNameValue.length > 0;
+            const passwordOk = result.len && result.upper && result.lower && result.digit && result.special && result.sequence;
+            const matchOk = result.match;
+
+            setFieldState(emailInput, emailOk);
+            setFieldState(firstNameInput, firstNameOk);
+            setFieldState(lastNameInput, lastNameOk);
+            setFieldState(pass1, passwordOk);
+            setFieldState(pass2, matchOk);
+
+            if (!emailOk) errors.push('Ingresa un correo electrónico válido.');
+            if (!firstNameOk) errors.push('El nombre es obligatorio.');
+            if (!lastNameOk) errors.push('El apellido es obligatorio.');
+            if (!passwordOk) errors.push('La contraseña no cumple las reglas requeridas.');
+            if (!matchOk) errors.push('La confirmación de contraseña no coincide.');
+
+            if (errors.length) {
+                event.preventDefault();
+                showFeedback(errors);
+                return;
+            }
+            showFeedback([]);
+        });
+    }
+    validate();
+})();
+</script>
+{% endblock %}

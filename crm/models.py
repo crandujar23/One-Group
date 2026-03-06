@@ -1,8 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
+from django.core.validators import MaxValueValidator
+from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
+
+from core.rbac.constants import RoleCode
 
 US_STATE_CHOICES = [
     ("AL", "Alabama"),
@@ -69,10 +73,90 @@ PHONE_VALIDATOR = RegexValidator(
 )
 
 
+def get_default_salesrep_level_id() -> int | None:
+    from core.models import Role
+
+    role = Role.objects.filter(code=RoleCode.SOLAR_CONSULTANT).only("id").first()
+    return role.id if role else None
+
+
 class SalesRep(models.Model):
     user = models.OneToOneField("auth.User", on_delete=models.CASCADE, related_name="sales_rep_profile")
     business_unit = models.ForeignKey("core.BusinessUnit", on_delete=models.CASCADE, related_name="sales_reps")
     tier = models.ForeignKey("rewards.Tier", on_delete=models.SET_NULL, null=True, blank=True, related_name="sales_reps")
+    sunrun_account_flag = models.BooleanField(default=False)
+    zoho_id = models.CharField(max_length=80, blank=True)
+    level = models.ForeignKey(
+        "core.Role",
+        on_delete=models.PROTECT,
+        related_name="sales_reps",
+        default=get_default_salesrep_level_id,
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="children_profiles",
+    )
+    consultant = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="advisor_profiles",
+    )
+    teamleader = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="manager_profiles",
+    )
+    manager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="senior_manager_profiles",
+    )
+    promanager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="elite_manager_profiles",
+    )
+    executivemanager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="business_manager_profiles",
+    )
+    jr_partner = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="jr_partner_profiles",
+    )
+    partner = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="partner_profiles",
+    )
+    parent_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    trainee_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    consultant_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    teamleader_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    manager_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    promanager_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    executivemanager_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    jr_partner_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
+    partner_rate = models.DecimalField(max_digits=6, decimal_places=4, default=0)
     phone = models.CharField(max_length=13, blank=True, validators=[PHONE_VALIDATOR])
     second_last_name = models.CharField(max_length=150, blank=True)
     postal_address_line_1 = models.CharField(max_length=120, blank=True)
@@ -95,12 +179,37 @@ class SalesRep(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["user__username"]
 
     def __str__(self) -> str:
-        return self.user.get_username()
+        level_name = self.level.name if self.level_id else "Sin nivel"
+        return f"{self.user.get_username()} ({level_name})"
+
+    def update_commission(self):
+        # Placeholder hook for commission recalculation after hierarchy/level updates.
+        # The current project computes compensation at sale-confirmation time.
+        return None
+
+
+class SalesrepLevel(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    sales_goal = models.PositiveIntegerField(default=0)
+    indirect_sales_cap_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    sort_value = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Lead(models.Model):

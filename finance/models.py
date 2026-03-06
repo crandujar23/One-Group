@@ -17,6 +17,23 @@ class Commission(models.Model):
         return f"Commission Sale #{self.sale_id}"
 
 
+class CommissionAllocation(models.Model):
+    commission = models.ForeignKey("finance.Commission", on_delete=models.CASCADE, related_name="allocations")
+    sale = models.ForeignKey("crm.Sale", on_delete=models.CASCADE, related_name="commission_allocations")
+    sales_rep = models.ForeignKey("crm.SalesRep", on_delete=models.CASCADE, related_name="commission_allocations")
+    role_code = models.CharField(max_length=40, blank=True)
+    share_percent = models.DecimalField(max_digits=6, decimal_places=4)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    calculated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-calculated_at", "id"]
+        unique_together = ("commission", "sales_rep")
+
+    def __str__(self) -> str:
+        return f"Allocation Sale #{self.sale_id} -> {self.sales_rep_id}"
+
+
 class FinancingCalculatorLink(models.Model):
     product = models.OneToOneField("inventory.Product", on_delete=models.CASCADE, related_name="financing_calculator")
     label = models.CharField(max_length=80, default="Calculator")

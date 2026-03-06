@@ -3,7 +3,8 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from core.models import BusinessUnit, UserProfile
+from core.models import BusinessUnit, Role, UserProfile
+from core.rbac.services import ensure_seeded_roles_and_permissions
 from crm.models import SalesRep
 from inventory.models import Product
 from rewards.models import CompensationPlan, PlanTierRule, Prize, Tier
@@ -20,6 +21,8 @@ class Command(BaseCommand):
         parser.add_argument("--admin-password", default="ChangeMe123!")
 
     def handle(self, *args, **options):
+        ensure_seeded_roles_and_permissions()
+
         business_units = ["Techo", "Solar Home Power", "SunVida", "Cash D", "Agua", "Internet"]
         bu_map = {}
         for name in business_units:
@@ -93,17 +96,20 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"Admin user already exists: {username}"))
 
         profile = admin_user.profile
-        profile.role = UserProfile.Role.ADMIN
+        profile.role = UserProfile.Role.PARTNER
+        profile.role_ref = Role.objects.filter(code=UserProfile.Role.PARTNER).first()
         profile.business_unit = None
-        profile.save(update_fields=["role", "business_unit"])
+        profile.save(update_fields=["role", "role_ref", "business_unit"])
 
         rep_user, _ = User.objects.get_or_create(username="salesrep_demo", defaults={"email": "rep@example.com"})
         rep_user.set_password("ChangeMe123!")
         rep_user.save()
         rep_profile = rep_user.profile
-        rep_profile.role = UserProfile.Role.SALES_REP
+        rep_profile.role = UserProfile.Role.SOLAR_CONSULTANT
+        rep_profile.role_ref = Role.objects.filter(code=UserProfile.Role.SOLAR_CONSULTANT).first()
         rep_profile.business_unit = techo_bu
-        rep_profile.save(update_fields=["role", "business_unit"])
+        rep_profile.save(update_fields=["role", "role_ref", "business_unit"])
         SalesRep.objects.get_or_create(user=rep_user, defaults={"business_unit": techo_bu, "tier": tier_junior})
 
         self.stdout.write(self.style.SUCCESS("Seed completed."))
+

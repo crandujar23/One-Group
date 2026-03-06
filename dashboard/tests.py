@@ -3,20 +3,28 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core import signing
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.cache import cache
 from django.test import TestCase
 from django.test import override_settings
+from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils import timezone
 
-from core.models import BusinessUnit, UserProfile
+from core.models import BusinessUnit, Role, UserProfile
 from crm.models import CallLog, SalesRep
 from dashboard.models import Announcement
+from dashboard.models import AdminInviteRequest
 from dashboard.models import Offer
+from dashboard.models import OperationsAdminInviteRequest
 from dashboard.models import SharedResource
+from dashboard.services.team_personal_info_service import compute_team_personal_metrics
+from dashboard.services.team_personal_info_service import sanitize_team_payload_for_actor
+from dashboard.services.sales_team_service import compute_sales_team_summary
 from finance.models import FinancingPartner
 from rewards.models import Tier
 
@@ -49,9 +57,18 @@ class DashboardSmokeTests(TestCase):
             email="manager_hybrid@test.com",
             password="secretpass123",
         )
+        self.operations_admin = User.objects.create_user(
+            username="ops_admin",
+            email="ops_admin@test.com",
+            password="secretpass123",
+            is_staff=True,
+        )
         self.manager_hybrid.profile.role = UserProfile.Role.MANAGER
         self.manager_hybrid.profile.business_unit = self.bu
         self.manager_hybrid.profile.save(update_fields=["role", "business_unit"])
+        self.operations_admin.profile.role = UserProfile.Role.ADMINISTRADOR
+        self.operations_admin.profile.business_unit = self.bu
+        self.operations_admin.profile.save(update_fields=["role", "role_ref", "business_unit"])
         profile = self.user.profile
         profile.role = UserProfile.Role.SALES_REP
         profile.business_unit = self.bu
@@ -59,6 +76,11 @@ class DashboardSmokeTests(TestCase):
         self.rep_sales_profile = SalesRep.objects.create(user=self.user, business_unit=self.bu, tier=self.tier)
         self.manager_sales_profile = SalesRep.objects.create(
             user=self.manager_hybrid,
+            business_unit=self.bu,
+            tier=self.tier,
+        )
+        self.operations_admin_sales_profile = SalesRep.objects.create(
+            user=self.operations_admin,
             business_unit=self.bu,
             tier=self.tier,
         )
@@ -99,10 +121,17 @@ class DashboardSmokeTests(TestCase):
         response = self.client.get(reverse("dashboard:sales_overview"))
         self.assertEqual(response.status_code, 200)
 
-    def test_salesrep_cannot_access_admin_overview(self):
+    def test_salesrep_home_redirects_to_admin_overview(self):
+        self.client.login(username="rep", password="secretpass123")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard:admin_overview"))
+
+    def test_salesrep_can_access_admin_overview(self):
         self.client.login(username="rep", password="secretpass123")
         response = self.client.get(reverse("dashboard:admin_overview"))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Resumen")
 
     def test_salesrep_can_access_associate_only_pages(self):
         self.client.login(username="rep", password="secretpass123")
@@ -111,14 +140,14 @@ class DashboardSmokeTests(TestCase):
         create_call_log = self.client.get(reverse("dashboard:call_log_create"))
         self.assertEqual(create_call_log.status_code, 200)
 
-    def test_manager_with_salesrep_record_does_not_get_associate_permissions(self):
+    def test_manager_with_salesrep_record_can_access_operational_pages(self):
         self.client.login(username="manager_hybrid", password="secretpass123")
 
         points = self.client.get(reverse("dashboard:points_summary"))
-        self.assertEqual(points.status_code, 403)
+        self.assertEqual(points.status_code, 200)
 
         create_call_log = self.client.get(reverse("dashboard:call_log_create"))
-        self.assertEqual(create_call_log.status_code, 403)
+        self.assertEqual(create_call_log.status_code, 200)
 
         call_logs = self.client.get(reverse("dashboard:call_logs"))
         self.assertEqual(call_logs.status_code, 200)
@@ -128,7 +157,7 @@ class DashboardSmokeTests(TestCase):
 
         sales_list = self.client.get(reverse("dashboard:sales_list"))
         self.assertEqual(sales_list.status_code, 200)
-        self.assertNotContains(sales_list, reverse("dashboard:points_summary"))
+        self.assertContains(sales_list, reverse("dashboard:points_summary"))
 
     def test_login_required(self):
         response = self.client.get(reverse("dashboard:sales_overview"))
@@ -175,7 +204,7 @@ class DashboardSmokeTests(TestCase):
 
     def test_admin_navbar_shows_superadmin_role(self):
         self.client.login(username="admin_test", password="secretpass123")
-        response = self.client.get(reverse("dashboard:home"))
+        response = self.client.get(reverse("dashboard:home"), follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Superadministrador")
 
@@ -303,35 +332,20 @@ class DashboardSmokeTests(TestCase):
         django_admin = self.client.get("/admin/")
         self.assertNotEqual(django_admin.status_code, 200)
 
-    def test_platform_admin_can_create_associate_access(self):
-        self.client.login(username="platform_admin", password="secretpass123")
-        response = self.client.get(reverse("dashboard:associate_create"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Crear Nuevo Asociado")
+    def test_operations_admin_cannot_access_django_admin(self):
+        self.client.login(username="ops_admin", password="secretpass123")
+        response = self.client.get("/admin/")
+        self.assertNotEqual(response.status_code, 200)
 
-        response = self.client.post(
-            reverse("dashboard:associate_create"),
-            data={
-                "username": "rep_new_access",
-                "email": "rep_new_access@test.com",
-                "first_name": "Rep",
-                "last_name": "Nuevo",
-                "password": "TempPass123!",
-                "business_units": [self.bu.id],
-                "tier": self.tier.id,
-            },
-            follow=True,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Asociado creado: rep_new_access")
-        created_user = User.objects.get(username="rep_new_access")
-        self.assertEqual(created_user.profile.role, UserProfile.Role.SALES_REP)
-        self.assertTrue(SalesRep.objects.filter(user=created_user, business_unit=self.bu).exists())
+    def test_operations_admin_cannot_access_commission_structure(self):
+        self.client.login(username="ops_admin", password="secretpass123")
+        response = self.client.get(reverse("dashboard:commission_structure"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard:sales_overview"))
 
-    def test_manager_cannot_access_associate_create(self):
-        self.client.login(username="manager_hybrid", password="secretpass123")
-        response = self.client.get(reverse("dashboard:associate_create"))
-        self.assertEqual(response.status_code, 403)
+    def test_associate_create_route_removed(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("dashboard:associate_create")
 
     def test_financing_page_shows_active_partners_by_default(self):
         self.client.login(username="rep", password="secretpass123")
@@ -357,6 +371,12 @@ class DashboardSmokeTests(TestCase):
         self.assertContains(response, reverse("dashboard:tasks"))
         self.assertContains(response, reverse("dashboard:tools"))
 
+    def test_manager_sales_overview_redirects_to_admin_overview(self):
+        self.client.login(username="manager_hybrid", password="secretpass123")
+        response = self.client.get(reverse("dashboard:sales_overview"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard:admin_overview"))
+
     def test_workspace_pages_are_accessible_for_authenticated_users(self):
         self.client.login(username="rep", password="secretpass123")
         for url_name in [
@@ -369,6 +389,52 @@ class DashboardSmokeTests(TestCase):
         ]:
             response = self.client.get(reverse(url_name))
             self.assertEqual(response.status_code, 200)
+
+    def test_level_changes_is_blocked_for_non_partner_users(self):
+        self.client.login(username="rep", password="secretpass123")
+        response = self.client.get(reverse("dashboard:level_changes"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_level_changes_is_available_for_partner_users(self):
+        self.client.login(username="platform_admin", password="secretpass123")
+        response = self.client.get(reverse("dashboard:level_changes"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_my_team_page_renders_new_layout(self):
+        self.client.login(username="rep", password="secretpass123")
+        response = self.client.get(reverse("dashboard:my_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Equipo Personal")
+        self.assertContains(response, "team-table")
+
+    def test_my_team_api_limits_salesrep_to_own_record(self):
+        self.client.login(username="rep", password="secretpass123")
+        response = self.client.get(reverse("dashboard:my_team_data_api"), {"draw": 1, "start": 0, "length": 10})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["recordsFiltered"], 1)
+        self.assertEqual(len(payload["data"]), 1)
+        self.assertEqual(payload["data"][0]["username"], "rep")
+
+    def test_my_team_api_manager_scope_and_all_forbidden(self):
+        self.client.login(username="manager_hybrid", password="secretpass123")
+        response = self.client.get(reverse("dashboard:my_team_data_api"), {"draw": 1, "start": 0, "length": 10})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertGreaterEqual(payload["recordsFiltered"], 2)
+        usernames = {row["username"] for row in payload["data"]}
+        self.assertIn("manager_hybrid", usernames)
+        self.assertIn("rep", usernames)
+
+        denied = self.client.get(reverse("dashboard:my_team_data_api"), {"all": "true"})
+        self.assertEqual(denied.status_code, 403)
+
+    def test_my_team_api_platform_admin_can_request_all(self):
+        self.client.login(username="platform_admin", password="secretpass123")
+        response = self.client.get(reverse("dashboard:my_team_data_api"), {"all": "true", "draw": 1, "start": 0, "length": 10})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertGreaterEqual(payload["recordsFiltered"], 2)
 
     def test_tools_page_allows_uploading_pdf_resource(self):
         self.client.login(username="rep", password="secretpass123")
@@ -821,25 +887,306 @@ class DashboardSmokeTests(TestCase):
     def test_password_reset_confirm_page_renders(self):
         uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
         token = default_token_generator.make_token(self.user)
-        response = self.client.get(reverse("password_reset_confirm", kwargs={"uidb64": uidb64, "token": token}))
+        response = self.client.get(
+            reverse("password_reset_confirm", kwargs={"uidb64": uidb64, "token": token}),
+            follow=True,
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Crear nueva contraseña")
+
+    def test_grow_team_generates_invitation_register_link(self):
+        self.client.login(username="admin_test", password="secretpass123")
+        response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "/pages/authentication/signup-invited/")
+
+    def test_salesrep_can_access_grow_team(self):
+        self.client.login(username="rep", password="secretpass123")
+        response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crece tu Equipo")
+
+    def test_invitation_register_page_renders_for_valid_token(self):
+        token = signing.TimestampSigner(salt="grow-team-invite").sign(f"{self.admin.id}:{UserProfile.Role.PARTNER}")
+        response = self.client.get(reverse("dashboard:invitation_register", args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crear una nueva cuenta")
+        self.assertContains(response, "registrarse como un Partner")
+        self.assertNotContains(response, "OneGroup Platform</a>")
+
+    def test_invitation_register_post_creates_consultant_account(self):
+        token = signing.TimestampSigner(salt="grow-team-invite").sign(f"{self.admin.id}:{UserProfile.Role.SOLAR_CONSULTANT}")
+        response = self.client.post(
+            reverse("dashboard:invitation_register", args=[token]),
+            data={
+                "email": "new.invited@example.com",
+                "first_name": "Nuevo",
+                "last_name": "Invitado",
+                "second_last_name": "Segundo",
+                "password1": "T9m!River#829",
+                "password2": "T9m!River#829",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        created = User.objects.filter(username="new.invited@example.com").first()
+        self.assertIsNotNone(created)
+        self.assertEqual(created.profile.role, UserProfile.Role.SOLAR_CONSULTANT)
+        self.assertEqual(created.profile.manager_id, self.admin.id)
+        self.assertTrue(SalesRep.objects.filter(user=created, second_last_name="Segundo").exists())
+
+    def test_legacy_invite_query_redirects_to_invitation_register(self):
+        token = signing.TimestampSigner(salt="grow-team-invite").sign(f"{self.admin.id}:{UserProfile.Role.SOLAR_CONSULTANT}")
+        response = self.client.get(f"{reverse('dashboard:sales_overview')}?invite={token}")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("dashboard:invitation_register", args=[token]), response.url)
+
+    def test_signup_invited_valid_normal_invitation(self):
+        inviter = self.user
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        response = self.client.get(reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invitado por")
+        self.assertContains(response, "registrarse como un")
+
+    def test_signup_invited_registration_persists_username_as_email(self):
+        inviter = self.user
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        response = self.client.post(
+            reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]),
+            data={
+                "email": "Invited.User@Example.com",
+                "first_name": "Invited",
+                "last_name": "User",
+                "second_last_name": "Account",
+                "password1": "A!strongpass991",
+                "password2": "A!strongpass991",
+                "parent_id": inviter.id,
+                "level_id": level_role.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        created = User.objects.filter(email="invited.user@example.com").first()
+        self.assertIsNotNone(created)
+        self.assertEqual(created.username, "invited.user@example.com")
+
+    def test_signup_invited_allows_empty_second_last_name(self):
+        inviter = self.user
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        response = self.client.post(
+            reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]),
+            data={
+                "email": "nosecond@example.com",
+                "first_name": "No",
+                "last_name": "Second",
+                "second_last_name": "",
+                "password1": "C!strongpass991",
+                "password2": "C!strongpass991",
+                "parent_id": inviter.id,
+                "level_id": level_role.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        created = User.objects.filter(email="nosecond@example.com").first()
+        self.assertIsNotNone(created)
+
+    def test_signup_invited_redirects_to_login_after_submit(self):
+        inviter = self.user
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        response = self.client.post(
+            reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]),
+            data={
+                "email": "redirect.login@example.com",
+                "first_name": "Redirect",
+                "last_name": "Login",
+                "second_last_name": "",
+                "password1": "D!strongpass991",
+                "password2": "D!strongpass991",
+                "parent_id": inviter.id,
+                "level_id": level_role.id,
+            },
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("login"))
+
+    def test_signup_invited_inherits_inviter_scope_without_salesrep_profile(self):
+        inviter = User.objects.create_user(
+            username="inviter_no_salesrep",
+            email="inviter_no_salesrep@example.com",
+            password="secretpass123",
+        )
+        inviter.profile.role = UserProfile.Role.MANAGER
+        inviter.profile.business_unit = self.other_bu
+        inviter.profile.save(update_fields=["role", "business_unit"])
+        inviter.profile.business_units.add(self.other_bu)
+
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        response = self.client.post(
+            reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]),
+            data={
+                "email": "inherit.scope@example.com",
+                "first_name": "Inherit",
+                "last_name": "Scope",
+                "second_last_name": "",
+                "password1": "D!strongpass992",
+                "password2": "D!strongpass992",
+                "parent_id": inviter.id,
+                "level_id": level_role.id,
+            },
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("login"))
+
+        created = User.objects.get(email="inherit.scope@example.com")
+        self.assertEqual(created.profile.manager_id, inviter.id)
+        self.assertEqual(created.profile.role, UserProfile.Role.SOLAR_CONSULTANT)
+        self.assertEqual(created.sales_rep_profile.business_unit_id, self.other_bu.id)
+
+    def test_signup_invited_admin_invitation_valid_sets_pending(self):
+        partner = User.objects.create_user(username="partner_signup", email="partner_signup@example.com", password="secretpass123")
+        partner.profile.role = UserProfile.Role.PARTNER
+        partner.profile.business_unit = self.bu
+        partner.profile.save(update_fields=["role", "business_unit"])
+        partner.profile.business_units.add(self.bu)
+        SalesRep.objects.create(user=partner, business_unit=self.bu, tier=self.tier)
+
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.ADMINISTRADOR,
+            defaults={"name": "Administrador", "priority": 90},
+        )
+        admin_invite = AdminInviteRequest.objects.create(
+            token="admin-token-valid-001",
+            inviter=partner,
+            level=level_role,
+            status=AdminInviteRequest.Status.INVITED,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            reverse("dashboard:signup_invited", args=[partner.id, level_role.id]) + "?invite_role=admin&invite_token=admin-token-valid-001",
+            data={
+                "email": "admin.invited@example.com",
+                "first_name": "Admin",
+                "last_name": "Invited",
+                "second_last_name": "Pending",
+                "password1": "B!strongpass991",
+                "password2": "B!strongpass991",
+                "parent_id": partner.id,
+                "level_id": level_role.id,
+                "invite_role": "admin",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        admin_invite.refresh_from_db()
+        self.assertEqual(admin_invite.status, AdminInviteRequest.Status.PENDING)
+        self.assertIsNotNone(admin_invite.invited_user_id)
+        self.assertIsNotNone(admin_invite.used_at)
+
+    def test_signup_invited_admin_invitation_invalid_or_expired_blocks(self):
+        partner = User.objects.create_user(username="partner_expired", email="partner_expired@example.com", password="secretpass123")
+        partner.profile.role = UserProfile.Role.PARTNER
+        partner.profile.business_unit = self.bu
+        partner.profile.save(update_fields=["role", "business_unit"])
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.ADMINISTRADOR,
+            defaults={"name": "Administrador", "priority": 90},
+        )
+        AdminInviteRequest.objects.create(
+            token="admin-token-expired-001",
+            inviter=partner,
+            level=level_role,
+            status=AdminInviteRequest.Status.INVITED,
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        response = self.client.get(
+            reverse("dashboard:signup_invited", args=[partner.id, level_role.id]) + "?invite_role=admin&invite_token=admin-token-expired-001"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You must be invited to register.")
+
+    def test_signup_invited_without_invitation_blocked(self):
+        response = self.client.get(reverse("dashboard:signup_invited", args=[999999, 999999]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You must be invited to register.")
+
+    def test_signup_invited_renders_even_when_user_is_authenticated(self):
+        inviter = self.user
+        level_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.SOLAR_CONSULTANT,
+            defaults={"name": "Solar Consultant", "priority": 30},
+        )
+        self.client.login(username="admin_test", password="secretpass123")
+        response = self.client.get(reverse("dashboard:signup_invited", args=[inviter.id, level_role.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crear una nueva cuenta")
 
     def test_salesrep_can_access_all_business_unit_pages(self):
         self.client.login(username="rep", password="secretpass123")
         response = self.client.get(reverse("dashboard:unit_solar"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Asesor Energetico")
+        self.assertContains(response, "Propuesta Solar")
         self.assertContains(response, "Cotizador")
         self.assertContains(response, "Accede SUNRUN")
-        self.assertContains(response, "Accede a tu Correo")
+        self.assertContains(response, "Accede a tu Correo", count=1)
+        self.assertContains(response, "Cliente Residencial")
+        self.assertContains(response, "Venta Residencial")
+        self.assertContains(response, "Cliente Comercial")
+        self.assertContains(response, "Venta Comercial")
+        self.assertContains(response, reverse("dashboard:solar_client_residential"))
+        self.assertContains(response, reverse("dashboard:solar_sale_residential"))
+        self.assertContains(response, reverse("dashboard:solar_client_commercial"))
+        self.assertContains(response, reverse("dashboard:solar_sale_commercial"))
 
         response = self.client.get(reverse("dashboard:unit_internet"))
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Asesor Energetico")
+        self.assertNotContains(response, "Propuesta Solar")
 
         response = self.client.get(reverse("dashboard:unit_techo"))
         self.assertEqual(response.status_code, 200)
+
+    def test_solar_segment_pages_are_available(self):
+        self.client.login(username="rep", password="secretpass123")
+
+        client_res = self.client.get(reverse("dashboard:solar_client_residential"))
+        self.assertEqual(client_res.status_code, 200)
+        self.assertContains(client_res, "Cliente Residencial")
+        self.assertContains(client_res, "Clientes Totales")
+
+        sale_res = self.client.get(reverse("dashboard:solar_sale_residential"))
+        self.assertEqual(sale_res.status_code, 200)
+        self.assertContains(sale_res, "Venta Residencial")
+        self.assertContains(sale_res, "Ventas Totales")
+
+        client_com = self.client.get(reverse("dashboard:solar_client_commercial"))
+        self.assertEqual(client_com.status_code, 200)
+        self.assertContains(client_com, "Cliente Comercial")
+        self.assertContains(client_com, "Clientes Totales")
+
+        sale_com = self.client.get(reverse("dashboard:solar_sale_commercial"))
+        self.assertEqual(sale_com.status_code, 200)
+        self.assertContains(sale_com, "Venta Comercial")
+        self.assertContains(sale_com, "Ventas Totales")
 
     def test_salesrep_profile_page_get_and_post(self):
         self.client.login(username="rep", password="secretpass123")
@@ -905,7 +1252,7 @@ class DashboardSmokeTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Upload a valid image")
+        self.assertContains(response, "imagen válida")
 
     def test_phone_must_match_required_format(self):
         self.client.login(username="rep", password="secretpass123")
@@ -968,3 +1315,384 @@ class DashboardSmokeTests(TestCase):
         self.assertEqual(self.user.email, "carlos.personal@example.com")
         rep = SalesRep.objects.get(user=self.user)
         self.assertEqual(rep.phone, "(787)555-1234")
+
+
+class TeamPersonalInfoTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.bu = BusinessUnit.objects.create(name="Internet", code="internet-team-personal")
+        self.tier = Tier.objects.create(name="Base Team", rank=99)
+        self.partner = User.objects.create_user(username="partner_tp", password="secretpass123")
+        self.manager = User.objects.create_user(username="manager_tp", password="secretpass123")
+        self.consultant = User.objects.create_user(username="consultant_tp", email="consultant@zensell.ai", password="secretpass123")
+        self.advisor = User.objects.create_user(username="advisor_tp", email="advisor@zensell.ai", password="secretpass123")
+
+        self.partner.profile.role = UserProfile.Role.PARTNER
+        self.partner.profile.save(update_fields=["role", "role_ref"])
+        self.manager.profile.role = UserProfile.Role.MANAGER
+        self.manager.profile.manager = self.partner
+        self.manager.profile.business_unit = self.bu
+        self.manager.profile.save(update_fields=["role", "role_ref", "manager", "business_unit"])
+        self.manager.profile.business_units.add(self.bu)
+
+        self.consultant.profile.role = UserProfile.Role.SOLAR_CONSULTANT
+        self.consultant.profile.manager = self.partner
+        self.consultant.profile.business_unit = self.bu
+        self.consultant.profile.save(update_fields=["role", "role_ref", "manager", "business_unit"])
+        self.advisor.profile.role = UserProfile.Role.SOLAR_ADVISOR
+        self.advisor.profile.manager = self.manager
+        self.advisor.profile.business_unit = self.bu
+        self.advisor.profile.save(update_fields=["role", "role_ref", "manager", "business_unit"])
+
+        SalesRep.objects.create(
+            user=self.consultant,
+            business_unit=self.bu,
+            tier=self.tier,
+            phone="(787)598-5039",
+            postal_city="Yabucoa",
+            is_active=True,
+        )
+        SalesRep.objects.create(
+            user=self.advisor,
+            business_unit=self.bu,
+            tier=self.tier,
+            phone="(787)500-0000",
+            postal_city="Humacao",
+            is_active=True,
+        )
+
+    def test_access_denied_without_team_permission(self):
+        outsider = User.objects.create_user(username="outsider_tp", password="secretpass123")
+        self.client.login(username="outsider_tp", password="secretpass123")
+        response = self.client.get(reverse("dashboard:associates_info"), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No tienes permisos para acceder a Mi Equipo.")
+
+    def test_partner_data_hidden_for_non_partner_actor(self):
+        actor = self.manager
+        rows = [
+            {
+                "full_name": "Partner Row",
+                "level_name": "Partner",
+                "partner_name": "partner_tp",
+                "parent_name": "",
+                "partner_rate": 10,
+                "is_operations_admin": False,
+            },
+            {
+                "full_name": "Consultant Row",
+                "level_name": "Solar Consultant",
+                "partner_name": "partner_tp",
+                "parent_name": "partner_tp",
+                "partner_rate": 5,
+                "is_operations_admin": False,
+            },
+        ]
+        sanitized = sanitize_team_payload_for_actor(rows, actor)
+        self.assertEqual(len(sanitized), 1)
+        self.assertEqual(sanitized[0]["full_name"], "Consultant Row")
+        self.assertEqual(sanitized[0]["partner_name"], "")
+        self.assertEqual(sanitized[0]["partner_rate"], 0)
+        self.assertEqual(sanitized[0]["parent_name"], "")
+
+    def test_level_and_city_filters_work_in_api(self):
+        self.client.login(username="partner_tp", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {
+                "format": "datatables",
+                "draw": 1,
+                "start": 0,
+                "length": 25,
+                "level": "Solar Consultant",
+                "city": "Yabucoa",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["recordsFiltered"], 1)
+        self.assertEqual(payload["data"][0]["city"], "Yabucoa")
+        self.assertEqual(payload["data"][0]["level_name"], "Solar Consultant")
+
+    def test_contactable_pct_calculation(self):
+        metrics = compute_team_personal_metrics(
+            [
+                {"phone": "(787)111-1111", "email": "a@a.com", "level_name": "Solar Consultant", "city": "Yabucoa"},
+                {"phone": "(787)222-2222", "email": "", "level_name": "Solar Advisor", "city": "Humacao"},
+            ]
+        )
+        self.assertEqual(metrics["team_totals"]["total"], 2)
+        self.assertEqual(metrics["team_totals"]["fully_contactable"], 1)
+        self.assertEqual(metrics["team_totals"]["contactable_pct"], 50.0)
+
+
+class SalesTeamTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.bu = BusinessUnit.objects.create(name="Solar Sales Team", code="solar-team")
+        self.tier = Tier.objects.create(name="Team Base", rank=10)
+
+        self.partner = User.objects.create_user(username="partner_st", password="secretpass123", email="partner_st@example.com")
+        self.manager = User.objects.create_user(username="manager_st", password="secretpass123", email="manager_st@example.com")
+        self.manager_direct = User.objects.create_user(username="manager_direct_st", password="secretpass123", email="manager_direct_st@example.com")
+        self.jr_partner = User.objects.create_user(username="jr_partner_st", password="secretpass123", email="jr_partner_st@example.com")
+        self.consultant = User.objects.create_user(
+            username="consultant_st",
+            password="secretpass123",
+            email="consultant_st@example.com",
+            first_name="Carlos",
+            last_name="Andujar",
+        )
+        self.advisor = User.objects.create_user(username="advisor_st", password="secretpass123", email="advisor_st@example.com")
+
+        self.partner.profile.role = UserProfile.Role.PARTNER
+        self.partner.profile.business_unit = self.bu
+        self.partner.profile.save(update_fields=["role", "business_unit"])
+        self.partner.profile.business_units.add(self.bu)
+
+        self.manager.profile.role = UserProfile.Role.SENIOR_MANAGER
+        self.manager.profile.manager = self.partner
+        self.manager.profile.business_unit = self.bu
+        self.manager.profile.save(update_fields=["role", "manager", "business_unit"])
+        self.manager.profile.business_units.add(self.bu)
+
+        self.manager_direct.profile.role = UserProfile.Role.MANAGER
+        self.manager_direct.profile.manager = self.partner
+        self.manager_direct.profile.business_unit = self.bu
+        self.manager_direct.profile.save(update_fields=["role", "manager", "business_unit"])
+        self.manager_direct.profile.business_units.add(self.bu)
+
+        self.jr_partner.profile.role = UserProfile.Role.JR_PARTNER
+        self.jr_partner.profile.manager = self.partner
+        self.jr_partner.profile.business_unit = self.bu
+        self.jr_partner.profile.save(update_fields=["role", "manager", "business_unit"])
+        self.jr_partner.profile.business_units.add(self.bu)
+
+        self.advisor.profile.role = UserProfile.Role.SOLAR_ADVISOR
+        self.advisor.profile.manager = self.manager
+        self.advisor.profile.business_unit = self.bu
+        self.advisor.profile.save(update_fields=["role", "manager", "business_unit"])
+        self.advisor.profile.business_units.add(self.bu)
+
+        self.consultant.profile.role = UserProfile.Role.SOLAR_CONSULTANT
+        self.consultant.profile.manager = self.advisor
+        self.consultant.profile.business_unit = self.bu
+        self.consultant.profile.save(update_fields=["role", "manager", "business_unit"])
+
+        SalesRep.objects.create(user=self.partner, business_unit=self.bu, tier=self.tier, phone="(787)100-1000", postal_city="Aibonito")
+        SalesRep.objects.create(user=self.manager, business_unit=self.bu, tier=self.tier, phone="(787)200-2000", postal_city="Yabucoa")
+        SalesRep.objects.create(user=self.manager_direct, business_unit=self.bu, tier=self.tier, phone="(787)555-7777", postal_city="Yabucoa")
+        SalesRep.objects.create(user=self.jr_partner, business_unit=self.bu, tier=self.tier, phone="(787)555-9999", postal_city="Yabucoa")
+        self.consultant_rep = SalesRep.objects.create(
+            user=self.consultant,
+            business_unit=self.bu,
+            tier=self.tier,
+            phone="(787)598-5039",
+            postal_city="Yabucoa",
+        )
+        SalesRep.objects.create(user=self.advisor, business_unit=self.bu, tier=self.tier, phone="(787)300-3000", postal_city="Humacao")
+
+    def test_sales_team_access_denied_without_permission(self):
+        outsider = User.objects.create_user(username="outsider_st", password="secretpass123")
+        self.client.login(username="outsider_st", password="secretpass123")
+        response = self.client.get(reverse("dashboard:apps_crm_sales_team_view"), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No tienes permisos para acceder a Mi Equipo.")
+
+    def test_sales_team_partner_data_hidden_for_non_partner(self):
+        self.client.login(username="manager_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertTrue(all(row["level_name"] != "Partner" for row in payload))
+        self.assertTrue(all((row.get("partner_name") or "") == "" for row in payload))
+
+    def test_sales_team_filter_level_and_sponsor(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {
+                "view": "salesteam",
+                "format": "datatables",
+                "level": "Solar Consultant",
+                "parent": "advisor_st",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["recordsFiltered"], 1)
+        self.assertEqual(payload["data"][0]["full_name"], "Carlos Andujar")
+
+    def test_sales_team_contactable_pct_calculation(self):
+        summary = compute_sales_team_summary(
+            [
+                {"phone": "(787)111-1111", "username": "corp1", "level_name": "Solar Consultant", "sort_value": 30},
+                {"phone": "", "username": "corp2", "level_name": "Manager", "sort_value": 50},
+            ],
+            self.partner.profile,
+        )
+        self.assertEqual(summary["team_totals"]["total"], 2)
+        self.assertEqual(summary["team_totals"]["contactable"], 1)
+        self.assertEqual(summary["team_totals"]["contactable_pct"], 50.0)
+
+    def test_sales_team_commission_distribution_for_consultant_chain(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables", "level": "Solar Consultant"},
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        consultant_row = next(row for row in rows if row["username"] == "consultant_st")
+        self.assertAlmostEqual(float(consultant_row["solar_consultant_rate"]), 0.06, places=3)
+        self.assertAlmostEqual(float(consultant_row["solar_advisor_rate"]), 0.06, places=3)
+        self.assertAlmostEqual(float(consultant_row["senior_manager_rate"]), 0.02, places=3)
+        self.assertAlmostEqual(float(consultant_row["partner_rate"]), 0.05, places=3)
+
+    def test_sales_team_commission_distribution_for_manager_direct_to_partner(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables", "level": "Manager"},
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        manager_row = next(row for row in rows if row["username"] == "manager_direct_st")
+        self.assertAlmostEqual(float(manager_row["manager_rate"]), 0.13, places=3)
+        self.assertAlmostEqual(float(manager_row["partner_rate"]), 0.06, places=3)
+
+    def test_sales_team_commission_distribution_for_jr_partner_direct_to_partner(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables", "level": "Jr Partner"},
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        jr_row = next(row for row in rows if row["username"] == "jr_partner_st")
+        self.assertAlmostEqual(float(jr_row["jr_partner_rate"]), 0.17, places=3)
+        self.assertAlmostEqual(float(jr_row["partner_rate"]), 0.02, places=3)
+
+    def test_sales_team_partner_rate_visible_for_partner_chain_only(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables"},
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        own_row = next(row for row in rows if row["username"] == "partner_st")
+        self.assertAlmostEqual(float(own_row.get("partner_rate") or 0), 0.19, places=3)
+        jr_row = next(row for row in rows if row["username"] == "jr_partner_st")
+        self.assertAlmostEqual(float(jr_row.get("partner_rate") or 0), 0.02, places=3)
+
+        self.client.login(username="manager_st", password="secretpass123")
+        manager_response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables"},
+        )
+        self.assertEqual(manager_response.status_code, 200)
+        manager_rows = manager_response.json()["data"]
+        self.assertTrue(all(float(row.get("partner_rate") or 0) == 0 for row in manager_rows))
+
+    def test_sales_team_parent_rate_is_hidden_for_all_users(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.get(
+            reverse("dashboard:salesrep_profile_api"),
+            {"view": "salesteam", "format": "datatables"},
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        self.assertTrue(all(float(row.get("parent_rate") or 0) == 0 for row in rows))
+
+    def test_sales_team_modal_action_ajax_success(self):
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.post(
+            reverse("dashboard:salesrep_promotion_modal", args=[self.consultant_rep.id]),
+            {"reason": "Promocion por desempeño"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+
+    def test_admin_invite_action_approve(self):
+        invite = OperationsAdminInviteRequest.objects.create(
+            invited_user=self.consultant,
+            inviter_partner=self.partner,
+            status=OperationsAdminInviteRequest.Status.PENDING,
+            expires_at=timezone.now() + timedelta(days=2),
+        )
+        self.client.login(username="partner_st", password="secretpass123")
+        response = self.client.post(
+            reverse("dashboard:apps_crm_salesteam_admin_invite_action", args=[invite.id]),
+            {"action": "approve"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        invite.refresh_from_db()
+        self.assertEqual(invite.status, OperationsAdminInviteRequest.Status.APPROVED)
+
+
+class SalesTeamGraphTests(TestCase):
+    def setUp(self):
+        self.bu = BusinessUnit.objects.create(name="Graph BU", code="graph-bu")
+        self.tier = Tier.objects.create(name="Graph Tier", rank=20)
+
+        self.partner = User.objects.create_user(username="partner_graph", password="secretpass123", email="partner_graph@example.com")
+        self.partner.profile.role = UserProfile.Role.PARTNER
+        self.partner.profile.business_unit = self.bu
+        self.partner.profile.save(update_fields=["role", "business_unit"])
+        self.partner.profile.business_units.add(self.bu)
+        self.partner_rep = SalesRep.objects.create(
+            user=self.partner,
+            business_unit=self.bu,
+            tier=self.tier,
+            phone="(787)777-7777",
+            postal_city="Yabucoa",
+            postal_state="PR",
+            is_active=True,
+        )
+
+    def test_graph_access_denied_without_permission(self):
+        outsider = User.objects.create_user(username="outsider_graph", password="secretpass123")
+        self.client.login(username="outsider_graph", password="secretpass123")
+        response = self.client.get(reverse("dashboard:apps_crm_salesteam_graph"), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No tienes permisos para acceder a Mi Equipo.")
+
+    def test_graph_user_without_salesrep_profile(self):
+        manager = User.objects.create_user(username="manager_graph", password="secretpass123")
+        manager.profile.role = UserProfile.Role.MANAGER
+        manager.profile.business_unit = self.bu
+        manager.profile.save(update_fields=["role", "business_unit"])
+        manager.profile.business_units.add(self.bu)
+        self.client.login(username="manager_graph", password="secretpass123")
+        response = self.client.get(reverse("dashboard:apps_crm_salesteam_graph"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Mapa de Jerarquía")
+
+    def test_graph_csv_has_expected_headers(self):
+        self.client.login(username="partner_graph", password="secretpass123")
+        response = self.client.get(reverse("dashboard:apps_crm_salesteam_graph_source"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="hierarchy.csv"')
+        first_line = response.content.decode("utf-8").splitlines()[0]
+        self.assertEqual(
+            first_line,
+            "name,imageUrl,area,profileUrl,office,tags,isLoggedUser,positionName,id,parentId,size",
+        )
+
+    def test_graph_csv_dataset_empty_and_non_empty(self):
+        self.client.login(username="partner_graph", password="secretpass123")
+        non_empty = self.client.get(reverse("dashboard:apps_crm_salesteam_graph_source"))
+        self.assertGreaterEqual(len(non_empty.content.decode("utf-8").splitlines()), 2)
+
+        self.partner_rep.is_active = False
+        self.partner_rep.save(update_fields=["is_active"])
+        empty = self.client.get(reverse("dashboard:apps_crm_salesteam_graph_source"))
+        self.assertEqual(len(empty.content.decode("utf-8").splitlines()), 1)

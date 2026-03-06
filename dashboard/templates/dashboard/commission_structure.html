@@ -1,0 +1,467 @@
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+<style>
+.sales-team-hero {
+    background: linear-gradient(120deg, #0f3b66 0%, #0c6b58 100%);
+    color: #fff;
+    border-radius: 1rem;
+}
+.sales-team-toolbar {
+    border: 1px solid #dbe3ea;
+    border-radius: .75rem;
+    background: #f8fafc;
+}
+.kpi-progress { height: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="sales-team-hero p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Sales Team Management</h1>
+            <p class="mb-0 opacity-75">Control operativo de equipo comercial y estructura de comisiones.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'dashboard:my_team' %}">Volver</a>
+    </div>
+</section>
+
+<section class="row g-3 mb-3 reveal reveal-delay-1">
+    <div class="col-12 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Integrantes</p><p class="kpi-value">{{ team_totals.total }}</p></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Contactables</p><p class="kpi-value kpi-accent-green">{{ team_totals.contactable }}</p><small>{{ team_totals.contactable_pct }}%</small><div class="progress mt-2 kpi-progress"><div class="progress-bar bg-success" style="width: {{ team_totals.contactable_pct }}%"></div></div></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Reportes directos</p><p class="kpi-value">{{ team_totals.direct_reports }}</p></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Niveles activos</p><p class="kpi-value">{{ team_totals.levels }}</p></article></div>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-2">Distribucion por nivel (Top 6)</h2>
+    <div class="d-flex flex-wrap gap-2">
+        {% for item in level_breakdown|slice:":6" %}
+        <span class="badge text-bg-light border">{{ item.name }}: {{ item.count }} ({{ item.percentage }}%)</span>
+        {% empty %}
+        <span class="text-muted">Sin datos</span>
+        {% endfor %}
+    </div>
+</section>
+
+{% if can_manage_admin_role and pending_admin_invites %}
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-2">Solicitudes pendientes de administrador</h2>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Usuario</th><th>Email</th><th>Fecha</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for invite in pending_admin_invites %}
+            <tr>
+                <td>{{ invite.invited_user.get_username }}</td>
+                <td>{{ invite.invited_user.email|default:"-" }}</td>
+                <td>{{ invite.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="d-flex gap-1">
+                    <button class="btn btn-sm btn-success js-admin-invite-action" data-url="{% url 'dashboard:apps_crm_salesteam_admin_invite_action' invite.id %}" data-action="approve">Aprobar</button>
+                    <button class="btn btn-sm btn-outline-danger js-admin-invite-action" data-url="{% url 'dashboard:apps_crm_salesteam_admin_invite_action' invite.id %}" data-action="reject">Rechazar</button>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="sales-team-toolbar p-3 mb-3 reveal reveal-delay-2">
+    <form id="sales-team-filters" class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-level">Nivel</label>
+            <select id="filter-level" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for item in level_breakdown %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-parent">Patrocinador</label>
+            <select id="filter-parent" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for sponsor in sponsors %}<option value="{{ sponsor }}">{{ sponsor }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-city">Ciudad</label>
+            <select id="filter-city" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                {% for city in cities %}<option value="{{ city }}">{{ city }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-search">Busqueda</label>
+            <input id="filter-search" class="form-control form-control-sm" type="search" placeholder="Nombre, telefono o correo">
+        </div>
+        <div class="col-12 d-flex justify-content-between align-items-center mt-2">
+            <button type="button" id="btn-reset-filters" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
+            <span id="live-counter" class="badge text-bg-primary">Mostrando 0 registros</span>
+        </div>
+    </form>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <div class="table-responsive">
+        <table id="sales-team-table" class="table table-modern table-striped align-middle w-100">
+            <thead>
+            <tr>
+                {% if can_start_salesrep_promotions %}<th>Promover</th>{% endif %}
+                {% if can_request_salesrep_removal %}<th>Eliminar</th>{% endif %}
+                <th>Nombre</th>
+                <th>Telefono</th>
+                <th>Nivel</th>
+                <th>Solar Consultant %</th>
+                <th>Patrocinador</th>
+                {% if show_solar_advisor %}
+                <th>Solar Advisor</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_manager %}
+                <th>Manager</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_senior_manager %}
+                <th>Senior Manager</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_elite_manager %}
+                <th>Elite Manager</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_business_manager %}
+                <th>Business Manager</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_jr_partner %}
+                <th>Jr Partner</th>
+                <th>%</th>
+                {% endif %}
+                {% if show_partner %}
+                <th>Partner</th>
+                <th>Partner %</th>
+                {% endif %}
+            </tr>
+            </thead>
+        </table>
+    </div>
+</section>
+
+<div class="modal fade" id="entityModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" id="entityModalContent"></div>
+    </div>
+</div>
+
+{{ swal_messages|json_script:"swal-messages" }}
+<script id="sales-team-config" type="application/json">{
+  "apiUrl": "{{ api_url }}",
+  "csrfToken": "{{ csrf_token }}",
+  "canPromote": {{ can_start_salesrep_promotions|yesno:"true,false" }},
+  "canManageAdmin": {{ can_manage_admin_role|yesno:"true,false" }},
+  "canRequestRemoval": {{ can_request_salesrep_removal|yesno:"true,false" }},
+  "canExecuteRemoval": {{ can_execute_salesrep_removal|yesno:"true,false" }},
+  "showSolarAdvisor": {{ show_solar_advisor|yesno:"true,false" }},
+  "showManager": {{ show_manager|yesno:"true,false" }},
+  "showSeniorManager": {{ show_senior_manager|yesno:"true,false" }},
+  "showEliteManager": {{ show_elite_manager|yesno:"true,false" }},
+  "showBusinessManager": {{ show_business_manager|yesno:"true,false" }},
+  "showJrPartner": {{ show_jr_partner|yesno:"true,false" }},
+  "showPartner": {{ show_partner|yesno:"true,false" }}
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+    const cfgNode = document.getElementById('sales-team-config');
+    if (!cfgNode || !window.jQuery || !window.jQuery.fn.DataTable) return;
+
+    const cfg = JSON.parse(cfgNode.textContent || '{}');
+    const $ = window.jQuery;
+    const levelFilter = document.getElementById('filter-level');
+    const parentFilter = document.getElementById('filter-parent');
+    const cityFilter = document.getElementById('filter-city');
+    const searchInput = document.getElementById('filter-search');
+    const resetButton = document.getElementById('btn-reset-filters');
+    const counter = document.getElementById('live-counter');
+
+    const normalize = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    $.fn.dataTable.ext.type.search.string = function (data) { return normalize(data); };
+
+    function pct(value) {
+        if (value === null || value === undefined || value === '') return '—';
+        const n = Number(value);
+        if (Number.isNaN(n)) return '—';
+        return Math.round(n * 100) + ' %';
+    }
+
+    function badgeName(data, row) {
+        const name = data || 'Sin dato';
+        return '<div class="fw-semibold">' + name + '</div>';
+    }
+
+    function linkOrFallback(type, value, fallback) {
+        if (!value) return fallback;
+        if (type === 'tel') return '<a href="tel:' + value + '">' + value + '</a>';
+        return '<a href="mailto:' + value + '">' + value + '</a>';
+    }
+
+    const columns = [];
+
+    function actionButton(label, url, klass) {
+        if (!url) return '—';
+        return '<button class="btn btn-sm ' + klass + ' js-open-entity-modal" data-url="' + url + '">' + label + '</button>';
+    }
+
+    if (cfg.canPromote) {
+        columns.push({ data: 'promotion_url', orderable: false, searchable: false, render: (d) => actionButton('Promover', d, 'btn-outline-primary') });
+    }
+    if (cfg.canRequestRemoval) {
+        columns.push({ data: 'removal_url', orderable: false, searchable: false, render: (d) => actionButton('Eliminar', d, 'btn-outline-danger') });
+    }
+
+    columns.push(
+        { data: 'full_name', name: 'full_name', render: badgeName },
+        { data: 'phone', name: 'phone', render: (d) => linkOrFallback('tel', d, 'Sin dato') },
+        { data: 'level_name', name: 'level' },
+        { data: 'solar_consultant_rate', render: pct },
+        { data: 'parent_name', name: 'parent', render: (d) => d || 'Sin patrocinador' }
+    );
+
+    if (cfg.showSolarAdvisor) {
+        columns.push(
+            { data: 'teamleader_name', render: (d) => d || '—' },
+            { data: 'solar_advisor_rate', render: pct }
+        );
+    }
+    if (cfg.showManager) {
+        columns.push(
+            { data: 'manager_name', render: (d) => d || '—' },
+            { data: 'manager_rate', render: pct }
+        );
+    }
+    if (cfg.showSeniorManager) {
+        columns.push(
+            { data: 'executive_manager_name', render: (d) => d || '—' },
+            { data: 'senior_manager_rate', render: pct }
+        );
+    }
+    if (cfg.showEliteManager) {
+        columns.push(
+            { data: 'executive_manager_name', render: (d) => d || '—' },
+            { data: 'elite_manager_rate', render: pct }
+        );
+    }
+    if (cfg.showBusinessManager) {
+        columns.push(
+            { data: 'promanager_name', render: (d) => d || '—' },
+            { data: 'business_manager_rate', render: pct }
+        );
+    }
+    if (cfg.showJrPartner) {
+        columns.push(
+            { data: 'jr_partner_name', render: (d) => d || '—' },
+            { data: 'jr_partner_rate', render: pct }
+        );
+    }
+    if (cfg.showPartner) {
+        columns.push(
+            { data: 'partner_name', render: (d) => d || '—' },
+            { data: 'partner_rate', render: pct }
+        );
+    }
+
+    const table = $('#sales-team-table').DataTable({
+        processing: true,
+        deferRender: true,
+        ajax: {
+            url: cfg.apiUrl,
+            dataSrc: 'data',
+            data: function (d) {
+                d.format = 'datatables';
+                d.view = 'salesteam';
+                d.level = levelFilter.value;
+                d.parent = parentFilter.value;
+                d.city = cityFilter.value;
+            }
+        },
+        columns: columns,
+        dom: "<'row g-2 mb-2'<'col-12 col-lg-7'B><'col-12 col-lg-5 text-lg-end'f>>" +
+             "<'row'<'col-12'tr>>" +
+             "<'row mt-2'<'col-12 col-md-5'i><'col-12 col-md-7'p>>",
+        buttons: [
+            { extend: 'copy', className: 'btn btn-sm btn-warning text-dark' },
+            { extend: 'excel', className: 'btn btn-sm btn-warning text-dark' },
+            { extend: 'print', className: 'btn btn-sm btn-warning text-dark' }
+        ],
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
+        language: {
+            processing: 'Cargando...',
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ registros',
+            infoEmpty: 'Sin registros',
+            zeroRecords: 'No se encontraron resultados',
+            paginate: { previous: 'Anterior', next: 'Siguiente' }
+        }
+    });
+
+    function updateCounter() {
+        const info = table.page.info();
+        counter.textContent = 'Mostrando ' + (info.recordsDisplay || 0) + ' registros';
+    }
+    table.on('init.dt draw.dt', updateCounter);
+
+    function exactColumnSearch(columnName, value) {
+        const idx = table.columns().indexes().toArray().find((i) => table.settings()[0].aoColumns[i].name === columnName);
+        if (idx === undefined) return;
+        table.column(idx).search(value ? '^' + $.fn.dataTable.util.escapeRegex(value) + '$' : '', true, false);
+    }
+
+    levelFilter.addEventListener('change', function () {
+        exactColumnSearch('level', levelFilter.value);
+        table.ajax.reload(null, false);
+    });
+    parentFilter.addEventListener('change', function () {
+        exactColumnSearch('parent', parentFilter.value);
+        table.ajax.reload(null, false);
+    });
+    cityFilter.addEventListener('change', function () { table.ajax.reload(null, false); });
+
+    searchInput.addEventListener('input', function () {
+        const term = normalize(searchInput.value || '');
+        if (!term) {
+            table.search('').draw();
+            return;
+        }
+        const settings = table.settings()[0];
+        const candidateColumns = [];
+        settings.aoColumns.forEach(function (col, idx) {
+            if (col.bVisible && col.bSearchable) candidateColumns.push(idx);
+        });
+        const firstThree = candidateColumns.slice(0, 3);
+        let matched = false;
+        table.search('');
+        table.columns().search('');
+        firstThree.forEach(function (idx) {
+            if (matched) return;
+            table.column(idx).search(term).draw();
+            if (table.rows({ filter: 'applied' }).count() > 0) {
+                matched = true;
+            }
+            if (!matched) {
+                table.column(idx).search('');
+            }
+        });
+        if (!matched) {
+            table.search(searchInput.value || '').draw();
+        }
+    });
+
+    resetButton.addEventListener('click', function () {
+        document.getElementById('sales-team-filters').reset();
+        table.search('').columns().search('');
+        table.ajax.reload(null, false);
+    });
+
+    const entityModalEl = document.getElementById('entityModal');
+    const entityModalBody = document.getElementById('entityModalContent');
+    const entityModal = window.bootstrap ? new window.bootstrap.Modal(entityModalEl) : null;
+
+    function csrfHeader() { return { 'X-CSRFToken': cfg.csrfToken, 'X-Requested-With': 'XMLHttpRequest' }; }
+
+    document.addEventListener('click', function (event) {
+        const btn = event.target.closest('.js-open-entity-modal');
+        if (!btn) return;
+        const url = btn.getAttribute('data-url');
+        if (!url || !entityModal) return;
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then((r) => r.text())
+            .then((html) => { entityModalBody.innerHTML = html; entityModal.show(); });
+    });
+
+    entityModalEl.addEventListener('submit', function (event) {
+        const form = event.target.closest('form.entity-modal-form');
+        if (!form) return;
+        event.preventDefault();
+        const progress = document.getElementById('entityModalProgress');
+        if (progress) progress.classList.remove('d-none');
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: csrfHeader()
+        })
+            .then((r) => r.text().then((text) => ({ status: r.status, text })))
+            .then(({ status, text }) => {
+                let payload = null;
+                try { payload = JSON.parse(text); } catch (e) { payload = null; }
+                if (status >= 200 && status < 300 && payload && payload.success) {
+                    entityModal.hide();
+                    table.ajax.reload(null, false);
+                    if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Exito', text: payload.message || 'Proceso completado', timer: 1500, showConfirmButton: false });
+                    return;
+                }
+                if (payload && payload.html) {
+                    entityModalBody.innerHTML = payload.html;
+                    return;
+                }
+                if (window.Swal) window.Swal.fire({ icon: 'error', title: 'Error', text: (payload && payload.message) || 'No fue posible completar la accion.' });
+            })
+            .finally(() => {
+                const reloaded = document.getElementById('entityModalProgress');
+                if (reloaded) reloaded.classList.add('d-none');
+            });
+    });
+
+    document.querySelectorAll('.js-admin-invite-action').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            fetch(btn.getAttribute('data-url'), {
+                method: 'POST',
+                headers: { ...csrfHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ action: btn.getAttribute('data-action') }).toString()
+            })
+            .then((r) => r.json())
+            .then((payload) => {
+                if (payload.success) {
+                    if (window.Swal) window.Swal.fire({ icon: 'success', title: 'Actualizado', text: payload.message, timer: 1500, showConfirmButton: false });
+                    window.setTimeout(() => window.location.reload(), 900);
+                } else if (window.Swal) {
+                    window.Swal.fire({ icon: 'error', title: 'Error', text: payload.message || 'No fue posible procesar la solicitud.' });
+                }
+            });
+        });
+    });
+
+    const messagesNode = document.getElementById('swal-messages');
+    if (messagesNode && window.Swal) {
+        let items = [];
+        try { items = JSON.parse(messagesNode.textContent || '[]'); } catch (e) { items = []; }
+        items.forEach((item) => {
+            const isError = (item.tags || '').indexOf('error') >= 0;
+            window.Swal.fire({
+                icon: isError ? 'error' : 'success',
+                title: 'Notificacion',
+                text: item.message,
+                timer: isError ? undefined : 1500,
+                showConfirmButton: isError
+            });
+        });
+    }
+})();
+</script>
+{% endblock %}

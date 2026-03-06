@@ -5,9 +5,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "django-insecure-change-me-in-production"
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1",
+    "http://localhost",
+]
 
 INSTALLED_APPS = [
+    "django.contrib.sites",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -20,6 +25,8 @@ INSTALLED_APPS = [
     "finance",
     "rewards",
     "dashboard",
+    "allauth",
+    "allauth.account",
 ]
 
 MIDDLEWARE = [
@@ -28,6 +35,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+    "core.rbac.middleware.RBACContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -90,6 +99,21 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard:home"
 LOGOUT_REDIRECT_URL = "login"
 
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+ACCOUNT_FORMS = {
+    "signup": "dashboard.forms.InvitedAllauthSignupForm",
+}
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
 EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@onegroup.local")
 
@@ -97,3 +121,5 @@ ENERGY_ADVISOR_URL = os.getenv("ENERGY_ADVISOR_URL", "#")
 QUOTER_URL = os.getenv("QUOTER_URL", "#")
 SUNRUN_ACCESS_URL = os.getenv("SUNRUN_ACCESS_URL", "#")
 EMAIL_ACCESS_URL = os.getenv("EMAIL_ACCESS_URL", "#")
+
+

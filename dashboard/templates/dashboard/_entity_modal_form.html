@@ -1,0 +1,32 @@
+<form method="post" class="entity-modal-form" action="{{ action_url }}" enctype="multipart/form-data" data-modal-kind="{{ modal_kind }}">
+    {% csrf_token %}
+    <div class="modal-header">
+        <h5 class="modal-title">{{ modal_title }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+    </div>
+    <div class="modal-body">
+        <p class="mb-2 text-muted">{{ modal_description }}</p>
+        {% for field in form %}
+        <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}
+            <span class="text-danger d-block">{{ error }}</span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        <div class="progress d-none" id="entityModalProgress" style="height: 6px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+        </div>
+        {% if non_field_errors %}
+            {% for error in non_field_errors %}
+            <span class="text-danger d-block">{{ error }}</span>
+            {% endfor %}
+        {% endif %}
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Confirmar</button>
+    </div>
+</form>

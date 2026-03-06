@@ -17,8 +17,7 @@
             <p class="mb-0 opacity-75">
                 {{ request.user.get_full_name|default:request.user.username }}
                 {% if sales_rep %}
-                    {% if sales_rep.tier %}| Nivel: {{ sales_rep.tier.name }}{% endif %}
-                    | Unidad: {{ sales_rep.business_unit.name }}
+                    {% if sales_rep.level %}| Nivel: {{ sales_rep.level.name }}{% elif request.user.profile %}| Nivel: {{ request.user.profile.get_role_display }}{% endif %}
                 {% else %}
                     | Perfil administrativo
                 {% endif %}

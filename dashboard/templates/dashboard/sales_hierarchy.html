@@ -1,0 +1,303 @@
+{% extends 'partials/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.graph-hero {
+    background:
+        radial-gradient(circle at 85% 20%, rgba(255,255,255,.18), transparent 38%),
+        linear-gradient(120deg, #0f5b49 0%, #274f9d 100%);
+    color: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 18px 36px rgba(16, 24, 40, .22);
+}
+.graph-card { border: 1px solid #e6ebf2; border-radius: 1rem; box-shadow: 0 10px 25px rgba(15,23,42,.07); background:#fff; }
+.kpi-pro {
+    border: 1px solid #e4e9f1;
+    border-radius: .9rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+.kpi-pro .kpi-label { letter-spacing: .04em; color:#5b6472; font-size:.78rem; text-transform: uppercase; }
+.kpi-pro .kpi-value { font-size: 1.85rem; font-weight: 800; color: #1e293b; line-height:1; }
+.kpi-icon {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e8f1ff; color: #1d4ed8; font-size: .92rem;
+}
+.level-chip {
+    display:inline-flex; align-items:center; gap:.4rem;
+    border:1px solid #d7e1ec; border-radius:999px;
+    padding:.28rem .72rem; background:#f8fbff; font-size:.84rem;
+    transition: all .18s ease;
+}
+.level-chip:hover { background:#eef5ff; border-color:#bfd0e6; transform: translateY(-1px); }
+.chart-shell { min-height: 620px; position: relative; border-radius: .9rem; background: linear-gradient(180deg,#fcfdff,#f7faff); border:1px solid #e3e9f2; overflow:hidden; }
+.chart-container { width: 100%; min-height: 600px; }
+.chart-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 3; background: rgba(255,255,255,.85); }
+.chart-floating-left { position: absolute; left: 12px; top: 12px; z-index: 4; }
+.chart-floating-right { position: absolute; right: 12px; top: 12px; z-index: 4; }
+.graph-toolbar .btn { border-radius: 10px; }
+.graph-toolbar .btn-outline-secondary { border-color:#cfd8e6; color:#334155; }
+.graph-toolbar .btn-outline-secondary:hover { background:#edf2fb; color:#0f172a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="graph-hero p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Mapa de Jerarquía</h1>
+            <p class="mb-0 opacity-75">Vista estructural de tu red comercial.</p>
+        </div>
+        <a class="btn btn-light btn-sm fw-semibold border shadow-sm hero-back-btn" href="{% url 'dashboard:my_team' %}">← Volver</a>
+    </div>
+</section>
+
+{% include "dashboard/_announcements_carousel.html" %}
+
+<section class="row g-3 mb-3 reveal reveal-delay-1">
+    <div class="col-12 col-md-3"><article class="kpi-pro p-3 h-100"><div class="d-flex justify-content-between align-items-start mb-2"><p class="kpi-label mb-0">Integrantes totales</p><span class="kpi-icon"><i class="bi bi-people"></i></span></div><p class="kpi-value">{{ team_totals.total }}</p></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-pro p-3 h-100"><div class="d-flex justify-content-between align-items-start mb-2"><p class="kpi-label mb-0">Reportes directos</p><span class="kpi-icon"><i class="bi bi-diagram-3"></i></span></div><p class="kpi-value">{{ team_totals.direct_reports }}</p></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-pro p-3 h-100"><div class="d-flex justify-content-between align-items-start mb-2"><p class="kpi-label mb-0">Niveles visibles</p><span class="kpi-icon"><i class="bi bi-layers"></i></span></div><p class="kpi-value">{{ team_totals.levels }}</p></article></div>
+    <div class="col-12 col-md-3"><article class="kpi-pro p-3 h-100"><div class="d-flex justify-content-between align-items-start mb-2"><p class="kpi-label mb-0">Profundidad estimada</p><span class="kpi-icon"><i class="bi bi-arrows-expand"></i></span></div><p class="kpi-value">{{ team_totals.depth }}</p></article></div>
+</section>
+
+<section class="graph-card p-3 mb-3 reveal reveal-delay-1 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h2 class="h6 mb-1">Resumen de generación</h2>
+        <small class="text-muted">Última generación: {{ last_generated|date:'Y-m-d H:i:s' }}</small>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ chart_source_url }}">Descargar CSV</a>
+    </div>
+</section>
+
+<section class="graph-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-2">Distribución por nivel</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        {% for level in level_breakdown %}
+        <span class="level-chip">{{ level.name }} <span class="text-muted">{{ level.count }} ({{ level.percentage }}%)</span></span>
+        {% empty %}
+        <span class="text-muted">Sin niveles visibles.</span>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="graph-card p-3 reveal reveal-delay-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 mb-0">Visualización del árbol</h2>
+        <div class="btn-group btn-group-sm graph-toolbar" role="group" aria-label="Graph controls top">
+            <button id="expandAllBtn" type="button" class="btn btn-outline-secondary">Expandir</button>
+            <button id="collapseAllBtn" type="button" class="btn btn-outline-secondary">Contraer</button>
+            <button id="fitTopBtn" type="button" class="btn btn-outline-primary">Ajustar a pantalla</button>
+            <button id="zoomOutBtn" type="button" class="btn btn-outline-secondary">Zoom -</button>
+            <button id="zoomInBtn" type="button" class="btn btn-outline-secondary">Zoom +</button>
+        </div>
+    </div>
+
+    <div class="chart-shell">
+        <div class="chart-floating-left">
+            <button id="fitLeftBtn" type="button" class="btn btn-sm btn-outline-primary">Ajustar</button>
+        </div>
+        <div class="chart-floating-right">
+            <button id="fitRightBtn" type="button" class="btn btn-sm btn-outline-primary">Ajustar</button>
+        </div>
+
+        <div id="chartLoading" class="chart-state">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 mb-0">Cargando jerarquía...</p>
+            </div>
+        </div>
+
+        <div id="chartError" class="alert alert-danger d-none" role="alert">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span id="chartErrorText">No se pudo cargar el gráfico.</span>
+                <button id="retryLoadBtn" type="button" class="btn btn-sm btn-outline-danger">Reintentar</button>
+            </div>
+        </div>
+        <div id="chartEmpty" class="alert alert-secondary d-none" role="alert">No hay datos de jerarquía para mostrar.</div>
+        <div id="salesTeamGraph" class="chart-container"></div>
+    </div>
+</section>
+
+{{ swal_messages|json_script:"swal-messages" }}
+<script id="graph-config" type="application/json">{
+  "chartSourceUrl": "{{ chart_source_url }}"
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-org-chart@2.6.0"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const configNode = document.getElementById('graph-config');
+    if (!configNode || !window.d3 || !window.d3.OrgChart) return;
+
+    const config = JSON.parse(configNode.textContent || '{}');
+    const loadingNode = document.getElementById('chartLoading');
+    const errorNode = document.getElementById('chartError');
+    const errorTextNode = document.getElementById('chartErrorText');
+    const emptyNode = document.getElementById('chartEmpty');
+    const retryBtn = document.getElementById('retryLoadBtn');
+
+    const fitButtons = [document.getElementById('fitTopBtn'), document.getElementById('fitLeftBtn'), document.getElementById('fitRightBtn')].filter(Boolean);
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const expandAllBtn = document.getElementById('expandAllBtn');
+    const collapseAllBtn = document.getElementById('collapseAllBtn');
+
+    let chart = null;
+
+    function hideLoading() {
+        if (loadingNode) loadingNode.classList.add('d-none');
+    }
+
+    function showError(message) {
+        hideLoading();
+        if (!errorNode) return;
+        errorNode.classList.remove('d-none');
+        if (errorTextNode) {
+            errorTextNode.textContent = message || 'No se pudo cargar el gráfico de jerarquía.';
+        }
+    }
+
+    function showEmpty() {
+        hideLoading();
+        if (emptyNode) emptyNode.classList.remove('d-none');
+    }
+
+    function depthColor(depth) {
+        const palette = ['#0b5ed7', '#198754', '#6f42c1', '#fd7e14', '#dc3545'];
+        return palette[Math.max(0, Math.min(depth, palette.length - 1))];
+    }
+
+    function debounce(fn, delay) {
+        let timer = null;
+        return function () {
+            clearTimeout(timer);
+            timer = setTimeout(fn, delay);
+        };
+    }
+
+    function loadChart() {
+        if (errorNode) errorNode.classList.add('d-none');
+        if (emptyNode) emptyNode.classList.add('d-none');
+        if (loadingNode) loadingNode.classList.remove('d-none');
+
+        d3.csv(config.chartSourceUrl).then(function (rows) {
+        const dataFlattened = rows || [];
+        if (!dataFlattened.length) {
+            showEmpty();
+            return;
+        }
+
+        dataFlattened.forEach(function (row) {
+            row.parentId = row.parentId || null;
+            row.isLoggedUser = String(row.isLoggedUser || '').toLowerCase() === 'true';
+            row.size = Number(row.size || 1);
+        });
+
+        chart = new d3.OrgChart()
+            .container('.chart-container')
+            .data(dataFlattened)
+            .nodeHeight(function () { return 70; })
+            .nodeWidth(function (d) {
+                const depth = (d.depth || 0);
+                return depth === 0 ? 320 : Math.max(210, 300 - (depth * 18));
+            })
+            .childrenMargin(function () { return 40; })
+            .compactMarginBetween(function () { return 25; })
+            .compactMarginPair(function () { return 70; })
+            .neightbourMargin(function () { return 20; })
+            .buttonContent(function ({ node }) {
+                const count = node.data._directSubordinates || 0;
+                return '<span style="font-size:11px;">' + count + '</span>';
+            })
+            .nodeContent(function (d) {
+                const data = d.data;
+                const border = data.isLoggedUser ? '2px solid #0d6efd' : '1px solid #d0d7e2';
+                const badgeColor = depthColor(d.depth || 0);
+                return '' +
+                    '<div style="height:100%;background:#fff;border-radius:14px;border:' + border + ';padding:8px 10px;box-shadow:0 8px 16px rgba(2,6,23,.10);display:flex;gap:8px;align-items:center;">' +
+                    '<img src="' + (data.imageUrl || '') + '" alt="avatar" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:1px solid #dbe5ef;" />' +
+                    '<div style="min-width:0;">' +
+                    '<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (data.name || '') + '</div>' +
+                    '<div style="display:inline-block;font-size:11px;margin-top:3px;padding:1px 8px;border-radius:999px;background:' + badgeColor + ';color:#fff;">' + (data.positionName || 'Sin nivel') + '</div>' +
+                    '<div style="font-size:11px;color:#4b5563;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (data.area || 'Sin área') + ' · ' + (data.office || 'Sin oficina') + '</div>' +
+                    '</div>' +
+                    '</div>';
+            })
+            .render();
+
+        hideLoading();
+        setTimeout(function () {
+            if (chart) chart.fit();
+        }, 80);
+
+        const onResize = debounce(function () {
+            if (chart) chart.fit();
+        }, 150);
+        window.addEventListener('resize', onResize);
+
+        fitButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (chart) chart.fit();
+            });
+        });
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', function () {
+                if (chart) chart.zoomIn();
+            });
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', function () {
+                if (chart) chart.zoomOut();
+            });
+        }
+        if (expandAllBtn) {
+            expandAllBtn.addEventListener('click', function () {
+                if (chart && typeof chart.expandAll === 'function') {
+                    chart.expandAll().fit();
+                }
+            });
+        }
+        if (collapseAllBtn) {
+            collapseAllBtn.addEventListener('click', function () {
+                if (chart && typeof chart.collapseAll === 'function') {
+                    chart.collapseAll().fit();
+                }
+            });
+        }
+        }).catch(function (error) {
+            showError((error && error.message) ? error.message : 'Error al cargar el origen del gráfico.');
+        });
+    }
+
+    loadChart();
+    if (retryBtn) {
+        retryBtn.addEventListener('click', loadChart);
+    }
+
+    const messagesNode = document.getElementById('swal-messages');
+    if (messagesNode && window.Swal) {
+        let payload = [];
+        try { payload = JSON.parse(messagesNode.textContent || '[]'); } catch (e) { payload = []; }
+        payload.forEach(function (item) {
+            const isError = (item.tags || '').indexOf('error') >= 0;
+            window.Swal.fire({
+                icon: isError ? 'error' : 'success',
+                title: 'Notificación',
+                text: item.message,
+                timer: isError ? undefined : 1500,
+                showConfirmButton: isError
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

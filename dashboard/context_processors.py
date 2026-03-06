@@ -1,6 +1,11 @@
+from django.conf import settings
 from dashboard.business_units import BUSINESS_UNIT_PAGES
 from core.models import UserProfile
 from core.models import BusinessUnit
+from core.rbac.constants import is_consultant_role
+from core.rbac.constants import is_manager_role
+from core.rbac.services import get_role_label
+from core.rbac.services import is_platform_admin
 from crm.models import SalesRep
 from dashboard.models import Announcement
 from django.utils import timezone
@@ -24,28 +29,19 @@ def _initials(value):
 
 
 def _role_label(user, profile):
-    if user.is_superuser:
-        return "Superadministrador"
-    if profile:
-        if profile.role == UserProfile.Role.ADMIN:
-            return "Socio"
-        if profile.role == UserProfile.Role.MANAGER:
-            return "Administrador"
-        if profile.role == UserProfile.Role.SALES_REP:
-            return "Asociado"
-    return "Usuario"
+    return get_role_label(user)
 
 
 def _is_platform_admin(user, profile):
-    return bool(user.is_superuser or (profile and profile.role == UserProfile.Role.ADMIN))
+    return is_platform_admin(user)
 
 
 def _is_associate(profile, sales_rep):
-    return bool(profile and profile.role == UserProfile.Role.SALES_REP and sales_rep)
+    return bool(profile and is_consultant_role(profile.role) and sales_rep)
 
 
 def _manager_business_unit_ids(profile):
-    if not profile or profile.role != UserProfile.Role.MANAGER:
+    if not profile or not is_manager_role(profile.role):
         return []
     ids = list(profile.business_units.values_list("id", flat=True))
     if not ids and profile.business_unit_id:
@@ -71,7 +67,7 @@ def navigation_context(request):
         allowed = False
         if _is_platform_admin(user, profile):
             allowed = True
-        elif profile and profile.role == UserProfile.Role.MANAGER:
+        elif profile and is_manager_role(profile.role):
             allowed = unit.id in _manager_business_unit_ids(profile)
         elif _is_associate(profile, sales_rep):
             allowed = True
@@ -92,10 +88,7 @@ def navigation_context(request):
     ]
     if user.is_superuser:
         operations_nav_items.insert(0, {"label": "Gestión de Accesos", "url_name": "dashboard:access_management", "url_key": "access_management"})
-    if _is_platform_admin(user, profile):
-        operations_nav_items.insert(1, {"label": "Nuevo Asociado", "url_name": "dashboard:associate_create", "url_key": "associate_create"})
-    if _is_associate(profile, sales_rep) or _is_platform_admin(user, profile):
-        operations_nav_items.insert(1, {"label": "Puntos", "url_name": "dashboard:points_summary", "url_key": "points_summary"})
+    operations_nav_items.insert(1, {"label": "Puntos", "url_name": "dashboard:points_summary", "url_key": "points_summary"})
     workspace_nav_items = [
         {"label": "Gestión de Clientes", "url_name": "dashboard:client_management", "url_key": "client_management"},
         {"label": "Mi equipo", "url_name": "dashboard:my_team", "url_key": "my_team"},
@@ -108,6 +101,11 @@ def navigation_context(request):
         nav_avatar_url = profile.avatar.url
     elif sales_rep and sales_rep.avatar:
         nav_avatar_url = sales_rep.avatar.url
+    email_access_url = (
+        settings.EMAIL_ACCESS_URL
+        if settings.EMAIL_ACCESS_URL != "#"
+        else "https://accounts.zoho.com/signin?servicename=ZohoHome&signupurl=https://www.zoho.com/signup.html"
+    )
 
     return {
         "nav_profile": profile,
@@ -122,8 +120,9 @@ def navigation_context(request):
         "operations_nav_items": operations_nav_items,
         "workspace_nav_items": workspace_nav_items,
         "is_admin_user": _is_platform_admin(user, profile),
-        "is_manager_user": bool(profile and profile.role == UserProfile.Role.MANAGER),
+        "is_manager_user": bool(profile and is_manager_role(profile.role)),
         "is_sales_rep_user": _is_associate(profile, sales_rep),
+        "nav_email_access_url": email_access_url,
     }
 
 

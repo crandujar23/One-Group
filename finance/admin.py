@@ -1,12 +1,19 @@
 from django.contrib import admin
 
-from finance.models import Commission, FinancialReport, FinancingCalculatorLink, FinancingPartner
+from finance.models import Commission, CommissionAllocation, FinancialReport, FinancingCalculatorLink, FinancingPartner
 
 
 @admin.register(Commission)
 class CommissionAdmin(admin.ModelAdmin):
     list_display = ("sale", "sales_rep", "business_unit", "commission_amount", "bonus_amount", "total_amount", "calculated_at")
     list_filter = ("business_unit",)
+    search_fields = ("sales_rep__user__username", "sale__external_reference")
+
+
+@admin.register(CommissionAllocation)
+class CommissionAllocationAdmin(admin.ModelAdmin):
+    list_display = ("sale", "sales_rep", "role_code", "share_percent", "amount", "calculated_at")
+    list_filter = ("role_code", "sale__business_unit")
     search_fields = ("sales_rep__user__username", "sale__external_reference")
 
 
