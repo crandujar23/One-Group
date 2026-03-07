@@ -1,10 +1,11 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from dashboard import views
 
 app_name = "dashboard"
 
 urlpatterns = [
+    re_path(r"^mi-equipo/(?P<raw_url>https?://.+)$", views.redirect_nested_absolute_url, name="redirect_nested_absolute_url"),
     path("", views.home, name="home"),
     path("admin-overview/", views.admin_overview, name="admin_overview"),
     path("solar/", views.business_unit_overview, {"unit_key": "solar"}, name="unit_solar"),

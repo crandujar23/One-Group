@@ -79,9 +79,11 @@ def fetch_hierarchy_iterative(root_salesrep_id: int, request) -> GraphBuildResul
     children_by_parent_rep_id: dict[int, list[int]] = {}
     for rep in reps:
         profile = getattr(rep.user, "profile", None)
-        if not profile or not profile.manager_id:
-            continue
-        parent_rep = user_to_rep.get(profile.manager_id)
+        parent_rep = None
+        if profile and profile.manager_id:
+            parent_rep = user_to_rep.get(profile.manager_id)
+        if not parent_rep and rep.parent_id:
+            parent_rep = rep_by_id.get(rep.parent_id)
         if not parent_rep:
             continue
         children_by_parent_rep_id.setdefault(parent_rep.id, []).append(rep.id)

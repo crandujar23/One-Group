@@ -63,23 +63,13 @@ def navigation_context(request):
         unit = business_unit_by_code.get(item["code"])
         if not unit and not _is_platform_admin(user, profile):
             continue
-
-        allowed = False
-        if _is_platform_admin(user, profile):
-            allowed = True
-        elif profile and is_manager_role(profile.role):
-            allowed = unit.id in _manager_business_unit_ids(profile)
-        elif _is_associate(profile, sales_rep):
-            allowed = True
-
-        if allowed:
-            unit_nav_items.append(
-                {
-                    "label": item["label"],
-                    "url_name": f"dashboard:{item['route_name']}",
-                    "code": item["code"],
-                }
-            )
+        unit_nav_items.append(
+            {
+                "label": item["label"],
+                "url_name": f"dashboard:{item['route_name']}",
+                "code": item["code"],
+            }
+        )
 
     operations_nav_items = [
         {"label": "Ventas", "url_name": "dashboard:sales_list", "url_key": "sales_list"},

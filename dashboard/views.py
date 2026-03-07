@@ -1,7 +1,9 @@
 from datetime import timedelta
 import csv
+import secrets
 from types import SimpleNamespace
 from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 from django import forms
 from django.conf import settings
@@ -23,6 +25,7 @@ from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden
 from django.http import HttpResponse
 from django.http import JsonResponse
+from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -37,6 +40,7 @@ from core.models import UserProfile
 from core.rbac.constants import ModuleCode
 from core.rbac.constants import PermissionAction
 from core.rbac.constants import RoleCode
+from core.rbac.constants import role_priority
 from core.rbac.constants import is_consultant_role
 from core.rbac.constants import is_manager_role
 from core.rbac.constants import ROLES_REQUIRING_BUSINESS_UNITS
@@ -171,6 +175,31 @@ def _resolve_business_units_for_inviter(inviter):
     return [fallback_unit] if fallback_unit else []
 
 
+def _inviteable_role_codes_for_user(user) -> set[str]:
+    # Admin role invitations are handled in the dedicated Partner-only admin flow.
+    excluded = {RoleCode.ADMINISTRADOR}
+    all_role_codes = {code for code, _ in UserProfile.Role.choices if code not in excluded}
+
+    if user.is_superuser:
+        return all_role_codes
+
+    profile = getattr(user, "profile", None)
+    inviter_role = getattr(profile, "role", None)
+    inviter_priority = role_priority(inviter_role)
+    if inviter_priority <= 0:
+        return set()
+
+    return {
+        code
+        for code in all_role_codes
+        if role_priority(code) < inviter_priority
+    }
+
+
+def _can_invite_role(user, role_code: str | None) -> bool:
+    return bool(role_code and role_code in _inviteable_role_codes_for_user(user))
+
+
 def _decode_grow_team_token(signed_token, *, max_age=GROW_TEAM_TOKEN_MAX_AGE_SECONDS):
     signer = signing.TimestampSigner(salt=GROW_TEAM_SIGNER_SALT)
     try:
@@ -193,6 +222,8 @@ def _decode_grow_team_token(signed_token, *, max_age=GROW_TEAM_TOKEN_MAX_AGE_SEC
     valid_levels = {code for code, _ in UserProfile.Role.choices}
     if not inviter or level_part not in valid_levels:
         return None, None, "El enlace de invitación no es válido."
+    if not _can_invite_role(inviter, level_part):
+        return None, None, "El enlace de invitación no es válido para el nivel solicitado."
     return inviter, level_part, ""
 
 
@@ -250,6 +281,10 @@ class CustomSignupView(SignupView):
             return
 
         parent_profile = getattr(parent, "profile", None)
+        if not _can_invite_role(parent, level.code):
+            self._clear_invite_session()
+            self._invitation_error = self.invitation_required_message
+            return
         parent_name = parent.get_full_name().strip() or parent.get_username()
         self.request.session["parent_name"] = parent_name
         self.request.session["level_name"] = level.name
@@ -422,13 +457,9 @@ def _sales_queryset(user, profile, sales_rep):
 def _can_access_business_unit(user, profile, sales_rep, business_unit):
     if _is_platform_admin(user, profile):
         return True
-    if profile and is_manager_role(profile.role):
-        return business_unit.id in _manager_business_unit_ids(profile)
-    if _is_associate(profile, sales_rep):
-        # Associates can open any business unit page, but their data remains scoped
-        # to their own SalesRep profile in `business_unit_overview`.
-        return True
-    return False
+    # Política: todo asociado autenticado puede entrar a Línea Comercial.
+    # El alcance de datos se controla luego con `_sales_queryset`.
+    return bool(profile or sales_rep)
 
 
 def _status_chart_data(sales_qs):
@@ -541,10 +572,34 @@ def _sales_quick_links():
 
 def _solar_segment_quick_links():
     return [
-        {"label": "Cliente Residencial", "url": reverse("dashboard:solar_client_residential"), "external": False},
-        {"label": "Venta Residencial", "url": reverse("dashboard:solar_sale_residential"), "external": False},
-        {"label": "Cliente Comercial", "url": reverse("dashboard:solar_client_commercial"), "external": False},
-        {"label": "Venta Comercial", "url": reverse("dashboard:solar_sale_commercial"), "external": False},
+        {
+            "label": "Cliente Residencial",
+            "description": "Gestiona prospectos y clientes del segmento residencial.",
+            "icon": "bi-house-door",
+            "url": reverse("dashboard:solar_client_residential"),
+            "external": False,
+        },
+        {
+            "label": "Venta Residencial",
+            "description": "Monitorea cierres, estados y montos residenciales.",
+            "icon": "bi-graph-up-arrow",
+            "url": reverse("dashboard:solar_sale_residential"),
+            "external": False,
+        },
+        {
+            "label": "Cliente Comercial",
+            "description": "Controla cartera comercial y trazabilidad por fuente.",
+            "icon": "bi-building",
+            "url": reverse("dashboard:solar_client_commercial"),
+            "external": False,
+        },
+        {
+            "label": "Venta Comercial",
+            "description": "Supervisa ventas comerciales con métricas clave.",
+            "icon": "bi-briefcase",
+            "url": reverse("dashboard:solar_sale_commercial"),
+            "external": False,
+        },
     ]
 
 
@@ -633,17 +688,16 @@ def business_unit_overview(request, unit_key):
     sales_rep = _sales_rep(request.user)
     business_unit = BusinessUnit.objects.filter(code=page["code"]).first()
 
+    if business_unit is None:
+        return HttpResponseForbidden("La unidad de negocio no esta disponible.")
+    if not _can_access_business_unit(request.user, profile, sales_rep, business_unit):
+        return HttpResponseForbidden("No autorizado")
+
     if _is_platform_admin(request.user, profile):
-        sales = Sale.objects.filter(business_unit=business_unit) if business_unit else Sale.objects.none()
-    else:
-        if business_unit is None:
-            return HttpResponseForbidden("La unidad de negocio no esta disponible.")
-        if not _can_access_business_unit(request.user, profile, sales_rep, business_unit):
-            return HttpResponseForbidden("No autorizado")
         sales = Sale.objects.filter(business_unit=business_unit)
-        # SalesRep users can access every unit page, but only with their own data.
-        if _is_associate(profile, sales_rep):
-            sales = sales.filter(sales_rep=sales_rep)
+    else:
+        # Mantener aislamiento de datos por usuario/rol aunque todos puedan abrir la página.
+        sales = _sales_queryset(request.user, profile, sales_rep).filter(business_unit=business_unit)
 
     sales = sales.select_related("sales_rep__user", "product", "plan", "business_unit")
     sales = sales.order_by("-created_at")
@@ -1406,6 +1460,26 @@ def apps_crm_sales_team_personal_info_view(request):
     return associates_info(request)
 
 
+@require_http_methods(["GET"])
+def redirect_nested_absolute_url(request, raw_url):
+    """
+    Defensive redirect for malformed URLs like:
+    /mi-equipo/http://127.0.0.1:8000/pages/authentication/signup-invited/...
+    """
+    candidate = (raw_url or "").strip()
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return HttpResponseBadRequest("URL inválida.")
+
+    if parsed.netloc != request.get_host():
+        return HttpResponseBadRequest("Destino no permitido.")
+
+    destination = parsed.path or "/"
+    if parsed.query:
+        destination = f"{destination}?{parsed.query}"
+    return redirect(destination)
+
+
 @login_required
 @require_http_methods(["GET"])
 def salesrep_profile_api(request):
@@ -1896,32 +1970,76 @@ def apps_crm_salesteam_admin_invite_action(request, request_id):
 @require_module_permission(ModuleCode.USERS, PermissionAction.VIEW)
 def grow_team(request):
     profile = _profile(request.user)
-    level = (request.GET.get("level") or UserProfile.Role.SOLAR_CONSULTANT).strip()
-    valid_levels = [code for code, _ in UserProfile.Role.choices]
-    if level not in valid_levels:
-        level = UserProfile.Role.SOLAR_CONSULTANT
+    allowed_codes = _inviteable_role_codes_for_user(request.user)
+    level_choices = [(code, label) for code, label in UserProfile.Role.choices if code in allowed_codes]
 
-    level_obj = Role.objects.filter(code=level).order_by("id").first() or Role.objects.order_by("priority", "id").first()
+    requested_level = (request.GET.get("level") or "").strip()
+    if requested_level in allowed_codes:
+        level = requested_level
+    elif level_choices:
+        level = level_choices[0][0]
+    else:
+        level = ""
+
+    level_obj = Role.objects.filter(code=level).order_by("id").first() if level else None
     signer = signing.TimestampSigner(salt=GROW_TEAM_SIGNER_SALT)
-    token_payload = f"{request.user.id}:{level}"
-    signed_token = signer.sign(token_payload)
+    signed_token = signer.sign(f"{request.user.id}:{level}") if level else ""
+    invite_link = request.build_absolute_uri(reverse("dashboard:grow_team"))
     if level_obj:
         invite_link = request.build_absolute_uri(reverse("dashboard:signup_invited", args=[request.user.id, level_obj.id]))
-    else:
+    elif signed_token:
         invite_link = request.build_absolute_uri(reverse("dashboard:invitation_register", args=[signed_token]))
     qr_query = urlencode({"text": invite_link, "size": "360"})
     qr_image_url = f"https://quickchart.io/qr?{qr_query}"
 
     inviter_role_label = "Modo Superadmin" if request.user.is_superuser else (profile.get_role_display() if profile else "Usuario")
+    can_invite_admin = bool(profile and profile.role == RoleCode.PARTNER)
+    admin_invite_token = ""
+    admin_invite_link = ""
+    admin_expires_at = None
+    if can_invite_admin:
+        admin_level = Role.objects.filter(code=RoleCode.ADMINISTRADOR).order_by("id").first()
+        if admin_level:
+            now = timezone.now()
+            admin_invite = (
+                AdminInviteRequest.objects.filter(
+                    inviter=request.user,
+                    level=admin_level,
+                    status=AdminInviteRequest.Status.INVITED,
+                    used_at__isnull=True,
+                    expires_at__gt=now,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if not admin_invite:
+                admin_invite = AdminInviteRequest.objects.create(
+                    token=secrets.token_urlsafe(32),
+                    inviter=request.user,
+                    level=admin_level,
+                    status=AdminInviteRequest.Status.INVITED,
+                    expires_at=now + timedelta(hours=24),
+                )
+            admin_invite_token = admin_invite.token
+            admin_expires_at = admin_invite.expires_at
+            admin_path = reverse("dashboard:signup_invited", args=[request.user.id, admin_level.id])
+            admin_query = urlencode({"invite_role": "admin", "invite_token": admin_invite_token})
+            admin_invite_link = request.build_absolute_uri(f"{admin_path}?{admin_query}")
+
     context = {
         "title": "Crece tu Equipo",
         "subtitle": "Invitacion de consultores",
-        "level_choices": UserProfile.Role.choices,
+        "level_choices": level_choices,
         "selected_level": level,
         "invite_link": invite_link,
         "signed_token": signed_token,
         "qr_image_url": qr_image_url,
         "inviter_role_label": inviter_role_label,
+        "can_invite_admin": can_invite_admin,
+        "admin_invite_token": admin_invite_token,
+        "admin_invite_link": admin_invite_link,
+        "admin_expires_at": admin_expires_at,
+        "can_invite_any_level": bool(level_choices),
         "now": timezone.now(),
     }
     return render(request, "dashboard/grow_team.html", context)
@@ -2033,6 +2151,45 @@ def my_team(request):
         for message in storage
     ]
 
+    quick_links = [
+        {
+            "label": "Informacion de Asociados",
+            "description": "Consulta y seguimiento detallado de tu red comercial.",
+            "icon": "bi-people",
+            "url": reverse("dashboard:associates_info"),
+        },
+        {
+            "label": "Jerarquia de Ventas",
+            "description": "Visualiza el arbol de patrocinio y estructura del equipo.",
+            "icon": "bi-diagram-3",
+            "url": reverse("dashboard:apps_crm_salesteam_graph"),
+        },
+        {
+            "label": "Crece tu Equipo",
+            "description": "Invita nuevos asociados y amplifica tu red.",
+            "icon": "bi-person-plus",
+            "url": reverse("dashboard:grow_team"),
+        },
+    ]
+    if not (profile and profile.role == RoleCode.ADMINISTRADOR):
+        quick_links.append(
+            {
+                "label": "Estructura de Comisiones",
+                "description": "Revisa niveles, patrocinadores y distribución vigente.",
+                "icon": "bi-cash-stack",
+                "url": reverse("dashboard:commission_structure"),
+            }
+        )
+    if request.user.is_superuser or (profile and profile.role == RoleCode.PARTNER):
+        quick_links.append(
+            {
+                "label": "Cambios de Nivel",
+                "description": "Administra y audita promociones dentro del equipo.",
+                "icon": "bi-arrow-up-circle",
+                "url": reverse("dashboard:level_changes"),
+            }
+        )
+
     context = {
         "title": "Equipo Personal",
         "subtitle": "Seguimiento operativo del equipo con filtros, exportación y métricas en tiempo real.",
@@ -2040,6 +2197,7 @@ def my_team(request):
         "cities": summary["cities"],
         "api_url": reverse("dashboard:my_team_data_api"),
         "swal_messages": swal_messages,
+        "quick_links": quick_links,
         "can_view_commission_structure": not (profile and profile.role == RoleCode.ADMINISTRADOR),
         "can_view_level_changes": bool(request.user.is_superuser or (profile and profile.role == RoleCode.PARTNER)),
     }

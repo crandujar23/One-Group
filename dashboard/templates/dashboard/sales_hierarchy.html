@@ -31,14 +31,130 @@
     transition: all .18s ease;
 }
 .level-chip:hover { background:#eef5ff; border-color:#bfd0e6; transform: translateY(-1px); }
-.chart-shell { min-height: 620px; position: relative; border-radius: .9rem; background: linear-gradient(180deg,#fcfdff,#f7faff); border:1px solid #e3e9f2; overflow:hidden; }
-.chart-container { width: 100%; min-height: 600px; }
+.chart-shell { min-height: 760px; position: relative; border-radius: .9rem; background: linear-gradient(180deg,#fcfdff,#f7faff); border:1px solid #e3e9f2; overflow:hidden; }
+.chart-container { width: 100%; min-height: 740px; }
 .chart-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 3; background: rgba(255,255,255,.85); }
 .chart-floating-left { position: absolute; left: 12px; top: 12px; z-index: 4; }
 .chart-floating-right { position: absolute; right: 12px; top: 12px; z-index: 4; }
 .graph-toolbar .btn { border-radius: 10px; }
 .graph-toolbar .btn-outline-secondary { border-color:#cfd8e6; color:#334155; }
 .graph-toolbar .btn-outline-secondary:hover { background:#edf2fb; color:#0f172a; }
+.org-node-card {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 16px;
+    border: 1px solid #d8e2ef;
+    background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, .10);
+    padding: 10px 12px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+.org-node-card.org-node-self {
+    border: 2px solid #0d6efd;
+    box-shadow: 0 14px 28px rgba(13, 110, 253, .18);
+}
+.org-node-card.org-node-clickable { cursor: pointer; }
+.org-node-card.org-node-clickable:hover {
+    transform: translateY(-2px);
+    border-color: #b8cae4;
+    box-shadow: 0 16px 28px rgba(15, 23, 42, .14);
+}
+.org-node-card.org-node-expanded {
+    background: linear-gradient(180deg, #ffffff 0%, #f2f8ff 100%);
+    border-color: #b6c9e6;
+    box-shadow: 0 16px 30px rgba(29, 78, 216, .15);
+}
+.org-node-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 2px solid #d9e2ef;
+    flex-shrink: 0;
+    background: #fff;
+}
+.org-node-body {
+    min-width: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.org-node-level-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+}
+.org-node-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.org-node-role {
+    display: inline-flex;
+    align-items: center;
+    max-width: calc(100% - 34px);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.org-node-meta {
+    font-size: 11px;
+    color: #5b6472;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+}
+.org-node-hint {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.org-node-direct-badge {
+    position: relative;
+    min-width: 18px;
+    height: auto;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    z-index: 1;
+    flex-shrink: 0;
+    margin-top: 0;
+    color: #2e65bf;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    position: relative;
+    z-index: 4;
+}
+.org-node-hitarea {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 3;
+}
 </style>
 {% endblock %}
 
@@ -85,7 +201,10 @@
 
 <section class="graph-card p-3 reveal reveal-delay-2">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h2 class="h6 mb-0">Visualización del árbol</h2>
+        <div>
+            <h2 class="h6 mb-0">Visualización del árbol</h2>
+            <small class="text-muted">Se muestran primero tus inscritos directos. Haz clic en cada líder para abrir su equipo.</small>
+        </div>
         <div class="btn-group btn-group-sm graph-toolbar" role="group" aria-label="Graph controls top">
             <button id="expandAllBtn" type="button" class="btn btn-outline-secondary">Expandir</button>
             <button id="collapseAllBtn" type="button" class="btn btn-outline-secondary">Contraer</button>
@@ -149,8 +268,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const expandAllBtn = document.getElementById('expandAllBtn');
     const collapseAllBtn = document.getElementById('collapseAllBtn');
+    const CHART_Y_OFFSET = -26;
 
     let chart = null;
+    let rootNodeId = null;
+    const expandedStateById = {};
 
     function hideLoading() {
         if (loadingNode) loadingNode.classList.add('d-none');
@@ -175,6 +297,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return palette[Math.max(0, Math.min(depth, palette.length - 1))];
     }
 
+    function roleBadgeColor(roleCode, depth) {
+        const byRole = {
+            PARTNER: '#1d4ed8',
+            JR_PARTNER: '#0f766e',
+            BUSINESS_MANAGER: '#047857',
+            ELITE_MANAGER: '#7c3aed',
+            SENIOR_MANAGER: '#6d28d9',
+            MANAGER: '#2563eb',
+            SOLAR_ADVISOR: '#0e7490',
+            SOLAR_CONSULTANT: '#334155'
+        };
+        return byRole[roleCode] || depthColor(depth);
+    }
+
     function debounce(fn, delay) {
         let timer = null;
         return function () {
@@ -182,6 +318,112 @@ document.addEventListener('DOMContentLoaded', function () {
             timer = setTimeout(fn, delay);
         };
     }
+
+    function applyChartYOffset() {
+        const graphGroup = document.querySelector('#salesTeamGraph svg g');
+        if (!graphGroup) return;
+        const transform = graphGroup.getAttribute('transform') || '';
+        const translateMatch = transform.match(/translate\(([-\d.]+)[ ,]([-\d.]+)\)/);
+        if (!translateMatch) return;
+
+        const x = Number(translateMatch[1]);
+        const y = Number(translateMatch[2]);
+        const alreadyAdjusted = graphGroup.getAttribute('data-y-offset-applied') === 'true';
+        const baseY = alreadyAdjusted ? (y - CHART_Y_OFFSET) : y;
+        const adjustedY = baseY + CHART_Y_OFFSET;
+        const nextTransform = transform.replace(translateMatch[0], 'translate(' + x + ',' + adjustedY + ')');
+
+        graphGroup.setAttribute('transform', nextTransform);
+        graphGroup.setAttribute('data-y-offset-applied', 'true');
+    }
+
+    function fitChartWithOffset() {
+        if (!chart) return;
+        chart.fit();
+        setTimeout(applyChartYOffset, 0);
+    }
+
+    function initializeCollapsedToDirects(rows) {
+        const root = rows.find(function (row) { return !row.parentId; });
+        rootNodeId = root ? root.id : null;
+        rows.forEach(function (row) {
+            const isRoot = rootNodeId && row.id === rootNodeId;
+            row._expanded = !!isRoot;
+            expandedStateById[row.id] = !!isRoot;
+        });
+    }
+
+    function markAllExpanded(expanded) {
+        Object.keys(expandedStateById).forEach(function (id) {
+            expandedStateById[id] = expanded;
+        });
+        if (!expanded && rootNodeId) {
+            expandedStateById[rootNodeId] = true;
+        }
+    }
+
+    function applyExpandedStateToAll(expanded) {
+        if (!chart) return;
+        const currentData = chart.data() || [];
+        currentData.forEach(function (row) {
+            const rowId = String(row.id);
+            const shouldExpand = expanded || (rootNodeId && rowId === String(rootNodeId));
+            row._expanded = !!shouldExpand;
+            expandedStateById[rowId] = !!shouldExpand;
+        });
+        chart.data(currentData).render();
+    }
+
+    function setNodeExpandedState(nodeId, expanded) {
+        if (!chart) return;
+        const currentData = chart.data() || [];
+        currentData.forEach(function (row) {
+            if (String(row.id) === String(nodeId)) {
+                row._expanded = !!expanded;
+            }
+        });
+        expandedStateById[String(nodeId)] = !!expanded;
+        chart.data(currentData).render();
+    }
+
+    function bindCardToggleListener() {
+        if (document.body.dataset.salesHierarchyCardBound === 'true') return;
+        document.addEventListener('click', function (event) {
+            const card = event.target.closest('.org-node-card[data-node-id]');
+            if (!card) return;
+            const nodeId = card.getAttribute('data-node-id');
+            if (!nodeId || !hasDirectChildren(nodeId)) return;
+            toggleNodeExpansion(String(nodeId));
+        });
+        document.body.dataset.salesHierarchyCardBound = 'true';
+    }
+
+    function hasDirectChildren(nodeId) {
+        if (!chart) return false;
+        const currentData = chart.data() || [];
+        const parentId = String(nodeId);
+        return currentData.some(function (row) {
+            return row.parentId && String(row.parentId) === parentId;
+        });
+    }
+
+    function toggleNodeExpansion(nodeId) {
+        if (!chart) return;
+        if (rootNodeId && nodeId === String(rootNodeId)) {
+            setNodeExpandedState(nodeId, true);
+            fitChartWithOffset();
+            return;
+        }
+        const nextState = !expandedStateById[String(nodeId)];
+        setNodeExpandedState(nodeId, nextState);
+        fitChartWithOffset();
+    }
+
+    window.__toggleSalesHierarchyNode = function (nodeId) {
+        if (!nodeId || !hasDirectChildren(String(nodeId))) return false;
+        toggleNodeExpansion(String(nodeId));
+        return false;
+    };
 
     function loadChart() {
         if (errorNode) errorNode.classList.add('d-none');
@@ -200,52 +442,71 @@ document.addEventListener('DOMContentLoaded', function () {
             row.isLoggedUser = String(row.isLoggedUser || '').toLowerCase() === 'true';
             row.size = Number(row.size || 1);
         });
+        initializeCollapsedToDirects(dataFlattened);
 
         chart = new d3.OrgChart()
             .container('.chart-container')
             .data(dataFlattened)
-            .nodeHeight(function () { return 70; })
+            .nodeHeight(function () { return 92; })
             .nodeWidth(function (d) {
                 const depth = (d.depth || 0);
-                return depth === 0 ? 320 : Math.max(210, 300 - (depth * 18));
+                return depth === 0 ? 320 : Math.max(230, 300 - (depth * 16));
             })
-            .childrenMargin(function () { return 40; })
-            .compactMarginBetween(function () { return 25; })
-            .compactMarginPair(function () { return 70; })
+            .childrenMargin(function () { return 36; })
+            .compactMarginBetween(function () { return 24; })
+            .compactMarginPair(function () { return 64; })
             .neightbourMargin(function () { return 20; })
-            .buttonContent(function ({ node }) {
-                const count = node.data._directSubordinates || 0;
-                return '<span style="font-size:11px;">' + count + '</span>';
-            })
+            .buttonContent(function () { return ''; })
             .nodeContent(function (d) {
                 const data = d.data;
-                const border = data.isLoggedUser ? '2px solid #0d6efd' : '1px solid #d0d7e2';
-                const badgeColor = depthColor(d.depth || 0);
+                const badgeColor = roleBadgeColor(data.tags, d.depth || 0);
+                const directCount = data._directSubordinates || 0;
+                const hasDirects = directCount > 0;
+                const metaText = hasDirects ? 'Equipo directo' : 'Sin inscritos directos';
+                const isExpanded = !!data._expanded;
+                let nodeClass = data.isLoggedUser ? 'org-node-card org-node-self' : 'org-node-card';
+                if (hasDirects) {
+                    nodeClass += ' org-node-clickable';
+                }
+                if (hasDirects && isExpanded) {
+                    nodeClass += ' org-node-expanded';
+                }
+                const directBadge = hasDirects
+                    ? ('<button type="button" class="org-node-direct-badge" data-node-id="' + data.id + '" aria-label="Inscritos directos ' + directCount + '">' + directCount + '</button>')
+                    : '';
+                const hitArea = hasDirects
+                    ? ('<button type="button" class="org-node-hitarea" aria-label="Expandir equipo" onclick="event.preventDefault(); event.stopPropagation(); return window.__toggleSalesHierarchyNode && window.__toggleSalesHierarchyNode(\'' + data.id + '\');"></button>')
+                    : '';
                 return '' +
-                    '<div style="height:100%;background:#fff;border-radius:14px;border:' + border + ';padding:8px 10px;box-shadow:0 8px 16px rgba(2,6,23,.10);display:flex;gap:8px;align-items:center;">' +
-                    '<img src="' + (data.imageUrl || '') + '" alt="avatar" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:1px solid #dbe5ef;" />' +
-                    '<div style="min-width:0;">' +
-                    '<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (data.name || '') + '</div>' +
-                    '<div style="display:inline-block;font-size:11px;margin-top:3px;padding:1px 8px;border-radius:999px;background:' + badgeColor + ';color:#fff;">' + (data.positionName || 'Sin nivel') + '</div>' +
-                    '<div style="font-size:11px;color:#4b5563;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (data.area || 'Sin área') + ' · ' + (data.office || 'Sin oficina') + '</div>' +
+                    '<div class="' + nodeClass + '" data-node-id="' + data.id + '">' +
+                    '<img class="org-node-avatar" src="' + (data.imageUrl || '') + '" alt="avatar" />' +
+                    '<div class="org-node-body">' +
+                    '<p class="org-node-name">' + (data.name || '') + '</p>' +
+                    '<div class="org-node-level-row">' +
+                    '<span class="org-node-role" style="background:' + badgeColor + ';">' + (data.positionName || 'Sin nivel') + '</span>' +
                     '</div>' +
+                    '<div class="org-node-meta"><span class="org-node-hint">' + metaText + '</span>' + directBadge + '</div>' +
+                    '</div>' +
+                    hitArea +
                     '</div>';
             })
             .render();
 
         hideLoading();
         setTimeout(function () {
-            if (chart) chart.fit();
+            if (chart) {
+                fitChartWithOffset();
+            }
         }, 80);
 
         const onResize = debounce(function () {
-            if (chart) chart.fit();
+            fitChartWithOffset();
         }, 150);
         window.addEventListener('resize', onResize);
 
         fitButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                if (chart) chart.fit();
+                fitChartWithOffset();
             });
         });
 
@@ -261,16 +522,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (expandAllBtn) {
             expandAllBtn.addEventListener('click', function () {
-                if (chart && typeof chart.expandAll === 'function') {
-                    chart.expandAll().fit();
-                }
+                if (!chart) return;
+                markAllExpanded(true);
+                applyExpandedStateToAll(true);
+                fitChartWithOffset();
             });
         }
         if (collapseAllBtn) {
             collapseAllBtn.addEventListener('click', function () {
-                if (chart && typeof chart.collapseAll === 'function') {
-                    chart.collapseAll().fit();
-                }
+                if (!chart) return;
+                markAllExpanded(false);
+                applyExpandedStateToAll(false);
+                fitChartWithOffset();
             });
         }
         }).catch(function (error) {

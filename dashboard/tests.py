@@ -405,7 +405,8 @@ class DashboardSmokeTests(TestCase):
         response = self.client.get(reverse("dashboard:my_team"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Equipo Personal")
-        self.assertContains(response, "team-table")
+        self.assertContains(response, "Accesos rapidos del equipo")
+        self.assertContains(response, "quick-access-card")
 
     def test_my_team_api_limits_salesrep_to_own_record(self):
         self.client.login(username="rep", password="secretpass123")
@@ -905,6 +906,64 @@ class DashboardSmokeTests(TestCase):
         response = self.client.get(reverse("dashboard:grow_team"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Crece tu Equipo")
+        self.assertNotContains(response, "Invitar Administrador (Solo Partner)")
+
+    def test_partner_sees_admin_invite_block_in_grow_team(self):
+        self.client.login(username="platform_admin", password="secretpass123")
+        self.platform_admin.profile.role = UserProfile.Role.PARTNER
+        self.platform_admin.profile.save(update_fields=["role"])
+        response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invitar Administrador (Solo Partner)")
+        self.assertContains(response, "invite_role=admin")
+
+    def test_superadmin_can_invite_partner_but_partner_cannot(self):
+        self.client.login(username="admin_test", password="secretpass123")
+        superadmin_response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(superadmin_response.status_code, 200)
+        self.assertContains(superadmin_response, 'value="PARTNER"')
+
+        self.client.login(username="platform_admin", password="secretpass123")
+        self.platform_admin.profile.role = UserProfile.Role.PARTNER
+        self.platform_admin.profile.save(update_fields=["role"])
+        partner_response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(partner_response.status_code, 200)
+        self.assertNotContains(partner_response, 'value="PARTNER"')
+
+    def test_jr_partner_and_business_manager_invite_limits(self):
+        jr_user = User.objects.create_user(username="jr_inviter", email="jr_inviter@test.com", password="secretpass123")
+        jr_user.profile.role = UserProfile.Role.JR_PARTNER
+        jr_user.profile.save(update_fields=["role"])
+
+        bm_user = User.objects.create_user(username="bm_inviter", email="bm_inviter@test.com", password="secretpass123")
+        bm_user.profile.role = UserProfile.Role.BUSINESS_MANAGER
+        bm_user.profile.save(update_fields=["role"])
+
+        self.client.login(username="jr_inviter", password="secretpass123")
+        jr_response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(jr_response.status_code, 200)
+        self.assertNotContains(jr_response, 'value="PARTNER"')
+        self.assertNotContains(jr_response, 'value="JR_PARTNER"')
+
+        self.client.login(username="bm_inviter", password="secretpass123")
+        bm_response = self.client.get(reverse("dashboard:grow_team"))
+        self.assertEqual(bm_response.status_code, 200)
+        self.assertNotContains(bm_response, 'value="PARTNER"')
+        self.assertNotContains(bm_response, 'value="JR_PARTNER"')
+        self.assertNotContains(bm_response, 'value="BUSINESS_MANAGER"')
+
+    def test_signup_invited_blocks_manual_bypass_for_higher_role(self):
+        inviter = User.objects.create_user(username="bm_direct", email="bm_direct@test.com", password="secretpass123")
+        inviter.profile.role = UserProfile.Role.BUSINESS_MANAGER
+        inviter.profile.save(update_fields=["role"])
+
+        partner_role, _ = Role.objects.get_or_create(
+            code=UserProfile.Role.PARTNER,
+            defaults={"name": "Partner", "priority": 100},
+        )
+        response = self.client.get(reverse("dashboard:signup_invited", args=[inviter.id, partner_role.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You must be invited to register.")
 
     def test_invitation_register_page_renders_for_valid_token(self):
         token = signing.TimestampSigner(salt="grow-team-invite").sign(f"{self.admin.id}:{UserProfile.Role.PARTNER}")
@@ -1696,3 +1755,32 @@ class SalesTeamGraphTests(TestCase):
         self.partner_rep.save(update_fields=["is_active"])
         empty = self.client.get(reverse("dashboard:apps_crm_salesteam_graph_source"))
         self.assertEqual(len(empty.content.decode("utf-8").splitlines()), 1)
+
+    def test_graph_uses_parent_fallback_when_manager_profile_link_is_missing(self):
+        missing_manager = User.objects.create_user(username="missing_manager_graph", password="secretpass123")
+        child = User.objects.create_user(
+            username="child_graph",
+            password="secretpass123",
+            first_name="Child",
+            last_name="Graph",
+            email="child_graph@example.com",
+        )
+        child.profile.role = UserProfile.Role.SOLAR_CONSULTANT
+        child.profile.business_unit = self.bu
+        child.profile.manager = missing_manager
+        child.profile.save(update_fields=["role", "business_unit", "manager"])
+        child.profile.business_units.add(self.bu)
+        SalesRep.objects.create(
+            user=child,
+            business_unit=self.bu,
+            tier=self.tier,
+            parent=self.partner_rep,
+            is_active=True,
+        )
+
+        cache.clear()
+        self.client.login(username="partner_graph", password="secretpass123")
+        response = self.client.get(reverse("dashboard:apps_crm_salesteam_graph_source"))
+        self.assertEqual(response.status_code, 200)
+        csv_content = response.content.decode("utf-8")
+        self.assertIn("Child Graph", csv_content)

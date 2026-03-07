@@ -1,5 +1,63 @@
 {% extends 'base.html' %}
 {% block title %}{{ unit_label }}{% endblock %}
+{% block extra_head %}
+<style>
+.solar-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+}
+@media (max-width: 1199.98px) {
+    .solar-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 991.98px) {
+    .solar-quick-grid { grid-template-columns: 1fr; }
+}
+.solar-quick-card {
+    display: block;
+    border: 1px solid #dbe5f4;
+    border-radius: .9rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    text-decoration: none;
+    padding: .9rem 1rem;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.solar-quick-card:hover {
+    transform: translateY(-2px);
+    border-color: #9ec5ff;
+    box-shadow: 0 10px 22px rgba(30, 64, 175, .12);
+}
+.solar-quick-head {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    margin-bottom: .2rem;
+}
+.solar-quick-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .95rem;
+    color: #1d4ed8;
+    background: #eaf2ff;
+}
+.solar-quick-title {
+    margin: 0;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: .98rem;
+}
+.solar-quick-desc {
+    margin: 0;
+    color: #64748b;
+    font-size: .84rem;
+    line-height: 1.35;
+}
+</style>
+{% endblock %}
 {% block content %}
 <section class="hero-card p-4 mb-4 reveal">
     <h1 class="h3 mb-2">{{ unit_label }}</h1>
@@ -20,17 +78,19 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h2 class="h6 mb-0">Accesos rapidos</h2>
     </div>
-    <div class="row g-2">
+    <div class="solar-quick-grid">
         {% for item in solar_segment_links %}
-        <div class="col-12 col-md-6">
-            <a
-                href="{{ item.url }}"
-                class="btn btn-outline-primary w-100"
-                {% if item.external and item.url != "#" %}target="_blank" rel="noopener"{% endif %}
-            >
-                {{ item.label }}
-            </a>
-        </div>
+        <a
+            href="{{ item.url }}"
+            class="solar-quick-card"
+            {% if item.external and item.url != "#" %}target="_blank" rel="noopener"{% endif %}
+        >
+            <div class="solar-quick-head">
+                <span class="solar-quick-icon"><i class="bi {{ item.icon|default:'bi-grid' }}"></i></span>
+                <h3 class="solar-quick-title">{{ item.label }}</h3>
+            </div>
+            <p class="solar-quick-desc">{{ item.description|default:"Acceso rápido del módulo solar." }}</p>
+        </a>
         {% endfor %}
     </div>
 </section>

@@ -17,18 +17,21 @@
     </div>
 </section>
 
+{% if can_invite_admin and admin_invite_link %}
 <section class="section-card p-3 mb-3 reveal reveal-delay-1">
     <div class="p-3 border rounded" style="background:#eaf6ff;">
         <div class="fw-semibold mb-1">Invitar Administrador (Solo Partner)</div>
         <div class="small text-muted mb-2">Este enlace dura 24 horas. El acceso quedara pendiente de tu aprobacion en CRM.</div>
-        <div class="small text-muted mb-2">Expira: {{ now|date:'Y-m-d H:i' }}</div>
+        <div class="small text-muted mb-2">Expira: {{ admin_expires_at|date:'Y-m-d H:i' }}</div>
         <div class="input-group input-group-sm">
-            <input id="admin-invite-token" type="text" class="form-control" readonly value="{{ signed_token }}">
-            <button id="copy-admin-token" class="btn btn-primary" type="button">Copiar</button>
+            <input id="admin-invite-link" type="text" class="form-control" readonly value="{{ admin_invite_link }}">
+            <button id="copy-admin-link" class="btn btn-primary" type="button">Copiar</button>
         </div>
     </div>
 </section>
+{% endif %}
 
+{% if can_invite_any_level %}
 <section class="section-card p-3 mb-3 reveal reveal-delay-2">
     <div class="small text-uppercase text-muted fw-semibold mb-2">Paso 1</div>
     <label for="invite-level" class="form-label">Selecciona nivel a invitar</label>
@@ -47,7 +50,15 @@
         <button id="copy-invite-link" class="btn btn-primary" type="button">Copiar</button>
     </div>
 </section>
+{% else %}
+<section class="section-card p-3 mb-3 reveal reveal-delay-2">
+    <div class="alert alert-warning mb-0">
+        Tu nivel actual no permite invitar nuevos asociados.
+    </div>
+</section>
+{% endif %}
 
+{% if can_invite_any_level %}
 <section class="section-card p-3 reveal reveal-delay-4">
     <div class="small text-uppercase text-muted fw-semibold mb-2">Paso 3</div>
     <p class="mb-3 small text-muted">Tambien puedes descargar, imprimir y compartir este codigo QR.</p>
@@ -58,6 +69,7 @@
         </div>
     </div>
 </section>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -71,10 +83,10 @@
         navigator.clipboard.writeText(el.value);
     }
 
-    const copyAdmin = document.getElementById('copy-admin-token');
+    const copyAdmin = document.getElementById('copy-admin-link');
     if (copyAdmin) {
         copyAdmin.addEventListener('click', function () {
-            copyById('admin-invite-token');
+            copyById('admin-invite-link');
         });
     }
 
