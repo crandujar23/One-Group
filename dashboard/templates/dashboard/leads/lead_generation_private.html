@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Genera Clientes{% endblock %}
+{% block extra_head %}
+<style>
+.leadgen-layout { display: grid; gap: 1rem; grid-template-columns: 1.5fr 1fr; }
+.leadgen-card { border: 1px solid #dbe5f4; border-radius: .9rem; background: #fff; padding: 1rem; }
+.leadgen-muted { color: #64748b; font-size: .9rem; }
+.leadgen-meta { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: .85rem; }
+.leadgen-meta-item { background: #f8fbff; border: 1px solid #e2e8f0; border-radius: .7rem; padding: .65rem .75rem; }
+.leadgen-meta-label { margin: 0; color: #64748b; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+.leadgen-meta-value { margin: .15rem 0 0; color: #1e293b; font-weight: 600; font-size: .92rem; word-break: break-word; }
+.leadgen-qr { display: flex; justify-content: center; align-items: center; min-height: 240px; border: 1px dashed #cbd5e1; border-radius: .75rem; background: #fcfdff; }
+.leadgen-qr img { max-width: 210px; width: 100%; height: auto; border-radius: .4rem; }
+.leadgen-qr-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin-bottom: .75rem; }
+.leadgen-steps { margin: 0; padding-left: 1.1rem; color: #475569; }
+.leadgen-copy-feedback { min-height: 1.2rem; font-size: .85rem; color: #0f766e; }
+@media (max-width: 991.98px) { .leadgen-layout { grid-template-columns: 1fr; } .leadgen-meta { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-2">Genera Clientes</h1>
+            <p class="mb-0 opacity-75">Comparte tu enlace personalizado para captar nuevos clientes.</p>
+        </div>
+        <a class="btn btn-light btn-sm hero-back-btn" href="{% url 'dashboard:unit_solar' %}">Volver</a>
+    </div>
+</section>
+
+{% if not has_salesrep_profile %}
+<div class="alert alert-warning reveal reveal-delay-1 mb-3">
+    No tienes perfil de asociado activo. Solicita activacion para usar este modulo.
+</div>
+{% endif %}
+
+<section class="leadgen-layout reveal reveal-delay-1">
+    <article class="leadgen-card">
+        <h2 class="h5 mb-3">Tu enlace de captacion</h2>
+        <div class="leadgen-meta">
+            <div class="leadgen-meta-item">
+                <p class="leadgen-meta-label">Estado</p>
+                <p class="leadgen-meta-value">
+                    {% if has_salesrep_profile %}
+                    <span class="badge bg-success-subtle text-success-emphasis">Perfil activo</span>
+                    {% else %}
+                    <span class="badge bg-warning-subtle text-warning-emphasis">Sin perfil</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="leadgen-meta-item">
+                <p class="leadgen-meta-label">Asociado</p>
+                <p class="leadgen-meta-value">{{ salesrep_name|default:"No disponible" }}{% if salesrep_id %} (ID {{ salesrep_id }}){% endif %}</p>
+            </div>
+            <div class="leadgen-meta-item">
+                <p class="leadgen-meta-label">Email asociado</p>
+                <p class="leadgen-meta-value">{{ email_associated|default:"No disponible" }}</p>
+            </div>
+            <div class="leadgen-meta-item">
+                <p class="leadgen-meta-label">URL publica base</p>
+                <p class="leadgen-meta-value">{{ public_base_url }}</p>
+            </div>
+        </div>
+
+        <label for="share-link" class="form-label fw-semibold mb-2">Enlace personalizado</label>
+        <div class="input-group mb-2">
+            <input id="share-link" type="text" class="form-control" value="{{ share_link }}" readonly>
+            <button id="copy-share-link" class="btn btn-outline-secondary" type="button" {% if not has_salesrep_profile %}disabled{% endif %}>Copiar</button>
+            <a class="btn btn-primary" href="{{ share_link }}" target="_blank" rel="noopener" {% if not has_salesrep_profile %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:.65;"{% endif %}>Abrir enlace</a>
+        </div>
+        <p id="copy-feedback" class="leadgen-copy-feedback mb-0" aria-live="polite"></p>
+    </article>
+
+    <article class="leadgen-card">
+        <h2 class="h5 mb-3">QR y uso</h2>
+        <div class="leadgen-qr mb-3">
+            {% if has_salesrep_profile %}
+            <img src="{{ qr_url }}" alt="QR del enlace de captacion" onerror="this.style.display='none';document.getElementById('qr-error-msg').style.display='block';">
+            <span id="qr-error-msg" class="leadgen-muted" style="display:none;">No se pudo generar el QR. Recarga la pagina o revisa dependencias del servidor.</span>
+            {% else %}
+            <span class="leadgen-muted">QR no disponible sin perfil activo</span>
+            {% endif %}
+        </div>
+        <div class="leadgen-qr-actions">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ qr_url }}" target="_blank" rel="noopener" {% if not has_salesrep_profile %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:.65;"{% endif %}>Ver QR</a>
+            <a class="btn btn-primary btn-sm" href="{{ qr_download_url }}" {% if not has_salesrep_profile %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:.65;"{% endif %}>Descargar QR</a>
+            <a class="btn btn-outline-primary btn-sm" href="{{ qr_marketing_download_url }}" {% if not has_salesrep_profile %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:.65;"{% endif %}>Descargar QR Marketing</a>
+        </div>
+        <p class="leadgen-muted text-center mb-2">Archivo identificado con marca, asesor y fecha para uso en campanas.</p>
+        <p class="fw-semibold mb-2">Como usarlo</p>
+        <ol class="leadgen-steps">
+            <li>Comparte el enlace o QR con tu cliente.</li>
+            <li>El cliente completa el formulario publico.</li>
+            <li>El lead entra al CRM asociado a tu perfil.</li>
+        </ol>
+    </article>
+</section>
+
+<script>
+(function () {
+    const input = document.getElementById('share-link');
+    const btn = document.getElementById('copy-share-link');
+    const feedback = document.getElementById('copy-feedback');
+    if (!input || !btn || !feedback) return;
+    const fallbackCopy = () => {
+        input.focus();
+        input.select();
+        try { return document.execCommand('copy'); } catch (e) { return false; }
+    };
+    btn.addEventListener('click', async function () {
+        const value = input.value || '';
+        if (!value) return;
+        let ok = false;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(value);
+                ok = true;
+            } else {
+                ok = fallbackCopy();
+            }
+        } catch (err) {
+            ok = fallbackCopy();
+        }
+        feedback.textContent = ok ? 'Enlace copiado al portapapeles.' : 'No se pudo copiar automaticamente.';
+        if (ok) {
+            btn.textContent = 'Copiado';
+            setTimeout(() => { btn.textContent = 'Copiar'; }, 1500);
+        }
+    });
+})();
+</script>
+{% endblock %}

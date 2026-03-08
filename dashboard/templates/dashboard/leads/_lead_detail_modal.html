@@ -1,0 +1,29 @@
+<div class="modal-body">
+    <div class="row g-2 mb-3">
+        <div class="col-md-6"><strong>Cliente:</strong> {{ lead.full_name }}</div>
+        <div class="col-md-6"><strong>Estado:</strong> {{ lead.get_status_display }}</div>
+        <div class="col-md-6"><strong>Telefono:</strong> {{ lead.phone|default:'-' }}</div>
+        <div class="col-md-6"><strong>Email:</strong> {{ lead.email|default:'-' }}</div>
+        <div class="col-md-6"><strong>Ciudad:</strong> {{ lead.city|default:'-' }}</div>
+        <div class="col-md-6"><strong>Origen:</strong> {{ lead.source|default:'-' }}</div>
+        <div class="col-md-6"><strong>Tipo de techo:</strong> {{ lead.roof_type|default:'-' }}</div>
+        <div class="col-md-6"><strong>Dueno:</strong> {{ lead.owner_name|default:'-' }}</div>
+    </div>
+    <h6 class="mb-2">Notas</h6>
+    <div class="border rounded p-2 mb-2" style="max-height: 240px; overflow: auto;">
+        {% for note in notes %}
+        <div class="mb-2 pb-2 border-bottom">
+            <div class="small text-muted">{{ note.created_at|date:'Y-m-d H:i' }} - {{ note.author.get_username|default:'Sistema' }}</div>
+            <div>{{ note.body }}</div>
+        </div>
+        {% empty %}
+        <div class="text-muted">Sin notas.</div>
+        {% endfor %}
+    </div>
+    <form method="post" action="{% url 'dashboard:crm_lead_note_create' lead.id %}" class="js-lead-modal-form">
+        {% csrf_token %}
+        <label class="form-label">Nueva nota</label>
+        <textarea class="form-control" name="body" rows="3"></textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary" type="submit">Guardar nota</button></div>
+    </form>
+</div>

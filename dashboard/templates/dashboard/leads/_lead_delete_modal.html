@@ -1,0 +1,10 @@
+<form method="post" action="{% url 'dashboard:crm_lead_delete_modal' lead.id %}" class="js-lead-modal-form">
+    {% csrf_token %}
+    <div class="modal-body">
+        <p class="mb-0">Confirma eliminar el lead <strong>{{ lead.full_name }}</strong>.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Eliminar</button>
+    </div>
+</form>

@@ -1229,8 +1229,8 @@ class DashboardSmokeTests(TestCase):
 
         client_res = self.client.get(reverse("dashboard:solar_client_residential"))
         self.assertEqual(client_res.status_code, 200)
-        self.assertContains(client_res, "Cliente Residencial")
-        self.assertContains(client_res, "Clientes Totales")
+        self.assertContains(client_res, "CRM Leads Residencial")
+        self.assertContains(client_res, "Total leads")
 
         sale_res = self.client.get(reverse("dashboard:solar_sale_residential"))
         self.assertEqual(sale_res.status_code, 200)

@@ -1,0 +1,15 @@
+{% extends 'dashboard/leads/_public_lead_base.html' %}
+{% block title %}Gracias por tu interes{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <h1 class="h3 mb-2">Gracias por tu solicitud</h1>
+    <p class="mb-0 opacity-75">Tu informacion fue recibida correctamente.</p>
+</section>
+
+<section class="section-card p-4 reveal reveal-delay-1">
+    <p class="mb-2">Nuestro equipo te contactara para orientarte sobre tu proyecto.</p>
+    {% if salesrep %}
+    <p class="text-muted mb-0">Asociado asignado: <strong>{{ salesrep.user.get_full_name|default:salesrep.user.username }}</strong></p>
+    {% endif %}
+</section>
+{% endblock %}

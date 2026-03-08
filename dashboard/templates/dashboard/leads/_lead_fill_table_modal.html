@@ -1,0 +1,26 @@
+<form method="post" action="{% url 'dashboard:crm_lead_fill_table_modal' %}" class="js-lead-modal-form">
+    {% csrf_token %}
+    <div class="p-3">
+        <div class="alert alert-info mb-3">
+            Esta accion crea clientes demo para poblar la tabla rapidamente.
+        </div>
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label">Cantidad (1-50)</label>
+                <input type="number" min="1" max="50" step="1" name="count" value="10" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Ciudad</label>
+                <input type="text" name="city" class="form-control" value="San Juan">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Origen</label>
+                <input type="text" name="source" class="form-control" value="Carga modal">
+            </div>
+        </div>
+    </div>
+    <div class="px-3 pb-3 d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Crear registros</button>
+    </div>
+</form>

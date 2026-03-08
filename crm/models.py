@@ -212,20 +212,282 @@ class SalesrepLevel(models.Model):
         return self.name
 
 
+class LeadSource(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Lead(models.Model):
+    class LeadKind(models.TextChoices):
+        RESIDENTIAL = "residential", "Residencial"
+        COMMERCIAL = "commercial", "Comercial"
+
+    class Status(models.TextChoices):
+        NUEVO = "Nuevo", "Nuevo"
+        CONTACTADO = "Contactado", "Contactado"
+        CALIFICADO = "Calificado", "Calificado"
+        DESCALIFICADO = "Descalificado", "Descalificado"
+        PROPUESTA_ENVIADA = "Propuesta Enviada", "Propuesta Enviada"
+        EN_NEGOCIACION = "En Negociación", "En Negociación"
+        VENDIDO = "Vendido", "Vendido"
+        PERDIDO = "Perdido", "Perdido"
+        # Compatibilidad con valores legacy existentes
+        NEW = "NEW", "Nuevo (legacy)"
+        PENDING = "PENDING", "Pendiente (legacy)"
+        CONTACTED = "CONTACTED", "Contactado (legacy)"
+        QUALIFIED = "QUALIFIED", "Calificado (legacy)"
+        CLOSED = "CLOSED", "Cerrado (legacy)"
+
     business_unit = models.ForeignKey("core.BusinessUnit", on_delete=models.CASCADE, related_name="leads")
     sales_rep = models.ForeignKey(SalesRep, on_delete=models.SET_NULL, null=True, blank=True, related_name="leads")
     full_name = models.CharField(max_length=120)
+    customer_name = models.CharField(max_length=120, blank=True)
     email = models.EmailField(blank=True)
+    customer_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
+    customer_phone = models.CharField(max_length=30, blank=True)
+    customer_phone2 = models.CharField(max_length=30, blank=True)
+    message = models.TextField(blank=True)
     source = models.CharField(max_length=80, blank=True)
+    lead_source = models.CharField(max_length=80, blank=True)
+    lead_kind = models.CharField(max_length=20, choices=LeadKind.choices, default=LeadKind.RESIDENTIAL, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NUEVO, db_index=True)
+    city = models.CharField(max_length=80, blank=True)
+    customer_city = models.CharField(max_length=80, blank=True)
+    address = models.CharField(max_length=200, blank=True)
+    customer_address = models.CharField(max_length=200, blank=True)
+    customer_postal_code = models.CharField(max_length=20, blank=True)
+    customer_country = models.CharField(max_length=80, blank=True)
+    roof_type = models.CharField(max_length=80, blank=True)
+    owner_name = models.CharField(max_length=120, blank=True)
+    owns_property = models.CharField(max_length=5, choices=[("SI", "SI"), ("NO", "NO")], blank=True)
+    electricity_bill = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    system_size = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    consumo_promedio_kwh = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    system_size_kw = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monthly_consumption_history = models.TextField(blank=True, default="[]")
+    electricity_invoice_language = models.CharField(max_length=40, blank=True)
+    id_consumo_historial = models.TextField(blank=True, default="[]")
+    hsp = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    eff = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    offset = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    last_4_ssn_luma = models.CharField(max_length=4, blank=True)
+    account_occupation_luma = models.CharField(max_length=120, blank=True)
+    marital_status = models.CharField(max_length=40, blank=True)
+    username_luma = models.CharField(max_length=120, blank=True)
+    password_luma = models.CharField(max_length=120, blank=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    customer_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    customer_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    invoice_pdf = models.FileField(upload_to="leads/invoices/", blank=True, null=True)
+    electricity_invoice_pdf = models.FileField(upload_to="leads/invoices/", blank=True, null=True)
+    electricity_invoice_page1_img = models.ImageField(upload_to="leads/invoices/", blank=True, null=True)
+    electricity_invoice_page2_img = models.ImageField(upload_to="leads/invoices/", blank=True, null=True)
+    electricity_invoice_page3_img = models.ImageField(upload_to="leads/invoices/", blank=True, null=True)
+    electricity_invoice_page4_img = models.ImageField(upload_to="leads/invoices/", blank=True, null=True)
+    use_invoice_images = models.BooleanField(default=False)
+    electricity_invoice_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    invoice_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    invoice_name = models.CharField(max_length=160, blank=True)
+    account_number = models.CharField(max_length=80, blank=True, db_index=True)
+    meter_number = models.CharField(max_length=80, blank=True, db_index=True)
+    location_id = models.CharField(max_length=80, blank=True, db_index=True)
+    sunrun_contract_signed = models.BooleanField(default=False)
+    sunrun_call_completed = models.BooleanField(default=False)
+    loan_reference_number = models.CharField(max_length=120, blank=True)
+    financing = models.CharField(max_length=120, blank=True)
+    battery_option = models.CharField(max_length=120, blank=True)
+    total_project_cost = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    proof_title = models.FileField(upload_to="leads/documents/", blank=True, null=True)
+    other_documents = models.FileField(upload_to="leads/documents/", blank=True, null=True)
+    assigned_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_leads",
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    acceptance_deadline = models.DateTimeField(null=True, blank=True, db_index=True)
+    work_deadline = models.DateTimeField(null=True, blank=True)
+    is_accepted = models.BooleanField(default=True, db_index=True)
+    duplicate_blocked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
         return self.full_name
+
+    @property
+    def create_date(self):
+        return self.created_at
+
+    @property
+    def status_display(self) -> str:
+        return self.get_status_display()
+
+    def acceptance_time_left(self) -> int:
+        if not self.acceptance_deadline:
+            return -1
+        delta = self.acceptance_deadline - timezone.now()
+        return max(int(delta.total_seconds()), 0)
+
+
+class LeadNote(models.Model):
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, related_name="lead_notes")
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        db_table = "crm_lead_note_v2"
+
+
+class LeadActivityLog(models.Model):
+    class ActivityType(models.TextChoices):
+        VIEW = "VIEW", "Ver detalle"
+        PHONE = "PHONE", "Llamada"
+        EMAIL = "EMAIL", "Correo"
+        SMS = "SMS", "SMS"
+        WHATSAPP = "WHATSAPP", "WhatsApp"
+        ASSIGN = "ASSIGN", "Asignacion"
+        ACCEPT = "ACCEPT", "Aceptacion"
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="activity_logs")
+    actor = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, related_name="lead_activity_logs")
+    activity_type = models.CharField(max_length=24, choices=ActivityType.choices)
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        db_table = "crm_lead_activity_log_v2"
+
+
+class InvoiceDuplicateReviewRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pendiente"
+        APPROVED = "APPROVED", "Aprobada"
+        REJECTED = "REJECTED", "Rechazada"
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="duplicate_review_requests")
+    requester = models.ForeignKey(SalesRep, on_delete=models.CASCADE, related_name="duplicate_review_requests")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    reason = models.TextField(blank=True)
+    resolver = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_duplicate_reviews",
+    )
+    resolver_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        db_table = "crm_invoice_duplicate_review_request_v2"
+
+
+class InvoiceDuplicateOverride(models.Model):
+    requester = models.ForeignKey(SalesRep, on_delete=models.CASCADE, related_name="invoice_duplicate_overrides")
+    account_number = models.CharField(max_length=80, blank=True, db_index=True)
+    meter_number = models.CharField(max_length=80, blank=True, db_index=True)
+    location_id = models.CharField(max_length=80, blank=True, db_index=True)
+    invoice_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    used_on_lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True, related_name="consumed_overrides")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        db_table = "crm_invoice_duplicate_override_v2"
+
+
+class CrmDeal(models.Model):
+    class DealKind(models.TextChoices):
+        RESIDENTIAL = "residential", "Residencial"
+        COMMERCIAL = "commercial", "Comercial"
+        PORTABLE_BATTERY = "portable_battery", "Portable Battery"
+        AUTOS = "autos", "Autos"
+
+    class Stage(models.TextChoices):
+        PLANNED = "planned", "Planificado"
+        APPROVED = "approved", "Aprobado"
+        SIGNED = "signed", "Firmado"
+        INSTALLED = "installed", "Instalado"
+        CLOSED = "closed", "Cerrado"
+
+    deal_kind = models.CharField(max_length=40, choices=DealKind.choices, default=DealKind.RESIDENTIAL, db_index=True)
+    salesrep = models.ForeignKey(SalesRep, on_delete=models.SET_NULL, null=True, blank=True, related_name="crm_deals")
+    imported_salesrep_name = models.CharField(max_length=180, blank=True)
+    imported_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="imported_crm_deals")
+    imported_at = models.DateTimeField(null=True, blank=True)
+
+    customer_name = models.CharField(max_length=160, blank=True)
+    customer_phone = models.CharField(max_length=30, blank=True)
+    customer_email = models.EmailField(blank=True)
+    customer_city = models.CharField(max_length=80, blank=True)
+    customer_address = models.CharField(max_length=200, blank=True)
+
+    proposal_id = models.CharField(max_length=120, blank=True, db_index=True)
+    sunrun_service_contract_id = models.CharField(max_length=120, blank=True, db_index=True)
+    system_size = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    epc_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    epc_base = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    epc_table = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    epc_adjustment = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    stage = models.CharField(max_length=40, choices=Stage.choices, default=Stage.PLANNED, db_index=True)
+
+    closing_date = models.DateField(null=True, blank=True, db_index=True)
+    sr_signoff_date = models.DateField(null=True, blank=True)
+    customer_sign_off_date = models.DateField(null=True, blank=True)
+    final_completion_date = models.DateField(null=True, blank=True)
+
+    consultant_name = models.CharField(max_length=160, blank=True)
+    advisor_name = models.CharField(max_length=160, blank=True)
+    manager_name = models.CharField(max_length=160, blank=True)
+    senior_manager_name = models.CharField(max_length=160, blank=True)
+    elite_manager_name = models.CharField(max_length=160, blank=True)
+    business_manager_name = models.CharField(max_length=160, blank=True)
+    jr_partner_name = models.CharField(max_length=160, blank=True)
+    partner_name = models.CharField(max_length=160, blank=True)
+
+    consultant_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    advisor_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    manager_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    senior_manager_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    elite_manager_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    business_manager_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    jr_partner_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+    partner_rate = models.DecimalField(max_digits=7, decimal_places=4, default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-closing_date", "-id"]
+        permissions = (
+            ("can_reassign_deal", "Can reassign deals"),
+        )
+
+    def __str__(self) -> str:
+        return self.customer_name or self.proposal_id or f"Deal {self.pk}"
 
 
 class Sale(models.Model):

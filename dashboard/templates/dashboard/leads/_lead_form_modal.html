@@ -1,0 +1,688 @@
+<form method="post" action="{% if lead %}{% url 'dashboard:crm_lead_update_modal' lead.id %}{% else %}{% url 'dashboard:crm_lead_create_modal' %}{% endif %}" enctype="multipart/form-data" class="js-lead-modal-form" id="lead-create-form">
+    {% csrf_token %}
+    <input type="hidden" id="lead-id" name="lead_id" value="{% if lead %}{{ lead.id }}{% endif %}">
+    <style>
+    .lead-form-shell { background: #f8fafc; }
+    .lead-pane { background: #ffffff; border: 1px solid #dbe3ea; border-radius: .6rem; padding: .85rem; }
+    .lead-pane-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #516174; font-weight: 700; margin-bottom: .6rem; }
+    .lead-form-shell .form-label { font-size: .87rem; font-weight: 600; color: #5d6d7f; margin-bottom: .35rem; }
+    .lead-form-shell .form-text { font-size: .75rem; }
+    .lead-form-shell .nav-tabs .nav-link { font-weight: 600; }
+    .lead-form-shell .nav-tabs .nav-link.active { background: #fff; border-top-left-radius: .45rem; border-top-right-radius: .45rem; }
+    .lead-footer { border-top: 1px solid #dbe3ea; background: #fff; }
+    .lead-pane input[type="text"],
+    .lead-pane input[type="email"],
+    .lead-pane input[type="number"],
+    .lead-pane select,
+    .lead-pane textarea {
+        display: block;
+        width: 100%;
+        min-height: 2.35rem;
+    }
+    .consumo-panel {
+        background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+        border-radius: .55rem;
+        padding: .85rem;
+        border: 1px solid #d7e0eb;
+        box-shadow: inset 0 1px 0 #fff;
+    }
+    .consumo-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: .5rem;
+        gap: .75rem;
+    }
+    .consumo-title {
+        font-size: .82rem;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #4d6076;
+    }
+    .consumo-subtitle {
+        font-size: .74rem;
+        color: #7b8ba0;
+    }
+    .consumo-month-label { font-size: .74rem; font-weight: 700; color: #607187; text-align: center; margin-bottom: .22rem; }
+    .consumo-panel .form-label { color: #5c6f85; font-weight: 700; margin-bottom: .22rem; font-size: .8rem; }
+    .consumo-panel .form-control {
+        border-color: #cfd8e4;
+        font-size: .85rem;
+        background: #fff;
+        border-radius: .42rem;
+        min-height: 2.15rem;
+    }
+    .consumo-panel .form-control:focus {
+        border-color: #9eb4cf;
+        box-shadow: 0 0 0 .12rem rgba(69, 111, 158, 0.12);
+    }
+    .months-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .35rem; }
+    .month-cell { min-width: 0; }
+    .month-cell input { width: 100%; }
+    #id_customer_address, #id_customer_city, #id_customer_postal_code, #id_customer_country { width: 100%; min-width: 100%; }
+    </style>
+    <div class="p-3 lead-form-shell">
+        <div id="lead-form-alert" class="alert alert-danger d-none"></div>
+
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lead-tab-1" type="button">Lead</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#lead-tab-2" type="button">Datos de LUMA</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#lead-tab-3" type="button">Cierre de Ventas</button></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="lead-tab-1">
+                <div class="lead-pane mb-2">
+                    <div class="lead-pane-title">Datos Comerciales</div>
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Estado</label>{{ form.status }}</div>
+                        <div class="col-md-4"><label class="form-label">Origen</label>{{ form.lead_source }}</div>
+                        <div class="col-md-4"><label class="form-label">Nombre del cliente</label>{{ form.customer_name }}</div>
+                        <div class="col-md-4"><label class="form-label">Telefono</label>{{ form.customer_phone }}</div>
+                        <div class="col-md-4"><label class="form-label">Telefono alterno</label>{{ form.customer_phone2 }}</div>
+                        <div class="col-md-4"><label class="form-label">Correo electronico</label>{{ form.customer_email }}</div>
+                    </div>
+                </div>
+                <div class="lead-pane mb-2">
+                    <div class="lead-pane-title">Ubicacion Del Cliente</div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Direccion</label>
+                            {{ form.customer_address }}
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Ciudad</label>
+                            {{ form.customer_city }}
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Codigo postal</label>
+                            {{ form.customer_postal_code }}
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Pais</label>
+                            {{ form.customer_country }}
+                        </div>
+                        <div class="col-md-3"><label class="form-label">Latitud</label>{{ form.customer_latitude }}</div>
+                        <div class="col-md-3"><label class="form-label">Longitud</label>{{ form.customer_longitude }}</div>
+                        <div class="col-md-3 d-flex align-items-end"><button type="button" class="btn btn-outline-secondary btn-sm w-100" id="btn-capture-coords">Capturar Coordenadas</button></div>
+                        <div class="col-md-3"><label class="form-label">Tipo de techo</label>{{ form.roof_type }}</div>
+                    </div>
+                </div>
+                <div class="lead-pane">
+                    <div class="lead-pane-title">Calculo Inicial</div>
+                    <div class="row g-2">
+                        <div class="col-md-4"><label class="form-label">Es propietario</label>{{ form.owns_property }}</div>
+                        <div class="col-md-4"><label class="form-label">Factura electrica</label>{{ form.electricity_bill }}</div>
+                        <div class="col-md-4"><label class="form-label">Tamano del sistema (kW)</label>{{ form.system_size }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="lead-tab-2">
+                <div class="lead-pane mb-2">
+                    <div class="lead-pane-title">Carga De Factura</div>
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label">PDF factura</label>{{ form.electricity_invoice_pdf }}</div>
+                        <div class="col-md-6 d-flex align-items-end" id="ocr-status-wrapper">
+                            <span class="badge text-bg-secondary me-2" id="ocr-status-badge">OCR pendiente</span>
+                            <div class="small text-muted"><span id="ocr-status-text">Sin procesar</span><div id="ocr-checklist" class="mt-1"></div></div>
+                        </div>
+                        <div class="col-12 d-none" id="duplicate-review-cta">
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-0">
+                                <div class="w-100">
+                                    <div class="mb-2" id="duplicate-review-msg">Se detecto posible duplicado.</div>
+                                    <textarea class="form-control form-control-sm mb-2" id="duplicate-review-reason" placeholder="Razon opcional para el Partner"></textarea>
+                                    <button type="button" class="btn btn-sm btn-outline-dark" id="btn-request-review">Solicitar revision al Partner</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-none" id="invoice-img-1-wrap"><label class="form-label">Factura pagina 1</label>{{ form.electricity_invoice_page1_img }}</div>
+                        <div class="col-md-6 d-none" id="invoice-img-2-wrap"><label class="form-label">Factura pagina 2</label>{{ form.electricity_invoice_page2_img }}</div>
+                        <div class="col-md-6 d-none" id="invoice-img-3-wrap"><label class="form-label">Factura pagina 3 (opcional)</label>{{ form.electricity_invoice_page3_img }}</div>
+                        <div class="col-md-6 d-none" id="invoice-img-4-wrap"><label class="form-label">Factura pagina 4 (opcional)</label>{{ form.electricity_invoice_page4_img }}</div>
+                    </div>
+                </div>
+                <div class="lead-pane mb-2">
+                    <div class="lead-pane-title">Datos De Servicio Luma</div>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Nombre en factura</label>
+                            {{ form.invoice_name }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Numero de cuenta</label>
+                            {{ form.account_number }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Numero de contador</label>
+                            {{ form.meter_number }}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">ID localidad</label>
+                            {{ form.location_id }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Historial de Consumo (hasta 12 meses):</label>
+                            {{ form.id_consumo_historial }}
+                            <div class="consumo-panel">
+                                <div class="consumo-head">
+                                    <div class="consumo-title">Historial mensual</div>
+                                    <div class="consumo-subtitle">Completa o valida antes de guardar</div>
+                                </div>
+                                <div class="months-grid" id="months-grid"></div>
+                                <div class="row g-2 mt-2 align-items-end">
+                                    <div class="col-md-3"><label class="form-label">HSP:</label>{{ form.hsp }}</div>
+                                    <div class="col-md-3"><label class="form-label">Eficiencia:</label>{{ form.eff }}</div>
+                                    <div class="col-md-3"><label class="form-label">Offset:</label>{{ form.offset }}</div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Promedio (meses disponibles):</label>
+                                        {{ form.consumo_promedio_kwh }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lead-pane">
+                    <div class="lead-pane-title">Acceso A Plataforma Luma</div>
+                    <div class="row g-2">
+                        <div class="col-md-3"><label class="form-label">Ultimos 4 SSN</label>{{ form.last_4_ssn_luma }}</div>
+                        <div class="col-md-3"><label class="form-label">Ocupacion cuenta</label>{{ form.account_occupation_luma }}</div>
+                        <div class="col-md-3"><label class="form-label">Usuario LUMA</label>{{ form.username_luma }}</div>
+                        <div class="col-md-3"><label class="form-label">Password LUMA</label>{{ form.password_luma }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="lead-tab-3">
+                <div class="lead-pane">
+                    <div class="lead-pane-title">Seguimiento De Cierre</div>
+                    <div class="row g-2">
+                        <div class="col-md-3 form-check mt-4">{{ form.sunrun_contract_signed }} <label class="form-check-label" for="{{ form.sunrun_contract_signed.id_for_label }}">Contrato firmado</label></div>
+                        <div class="col-md-3 form-check mt-4">{{ form.sunrun_call_completed }} <label class="form-check-label" for="{{ form.sunrun_call_completed.id_for_label }}">Llamada completada</label></div>
+                        <div class="col-md-6"><label class="form-label">Loan Reference</label>{{ form.loan_reference_number }}</div>
+                        <div class="col-md-4"><label class="form-label">Financing</label>{{ form.financing }}</div>
+                        <div class="col-md-4"><label class="form-label">Battery option</label>{{ form.battery_option }}</div>
+                        <div class="col-md-4"><label class="form-label">Costo total proyecto</label>{{ form.total_project_cost }}</div>
+                        <div class="col-md-6"><label class="form-label">Proof title</label>{{ form.proof_title }}</div>
+                        <div class="col-md-6"><label class="form-label">Otros documentos</label>{{ form.other_documents }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="px-3 py-3 d-flex justify-content-end gap-2 lead-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+    </div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+<script>
+(function () {
+    const form = document.getElementById('lead-create-form');
+    if (!form) return;
+
+    const alertBox = document.getElementById('lead-form-alert');
+    const csrf = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const leadId = form.querySelector('#lead-id');
+    const pdfInput = form.querySelector('#id_electricity_invoice_pdf');
+    const useImages = form.querySelector('#id_use_invoice_images');
+    const img1Wrap = document.getElementById('invoice-img-1-wrap');
+    const img2Wrap = document.getElementById('invoice-img-2-wrap');
+    const page1Input = form.querySelector('#id_electricity_invoice_page1_img');
+    const page2Input = form.querySelector('#id_electricity_invoice_page2_img');
+    const page3Input = form.querySelector('#id_electricity_invoice_page3_img');
+    const page4Input = form.querySelector('#id_electricity_invoice_page4_img');
+    const img3Wrap = document.getElementById('invoice-img-3-wrap');
+    const img4Wrap = document.getElementById('invoice-img-4-wrap');
+    const languageInput = form.querySelector('#id_electricity_invoice_language');
+    const ocrBadge = document.getElementById('ocr-status-badge');
+    const ocrChecklist = document.getElementById('ocr-checklist');
+    const duplicateCta = document.getElementById('duplicate-review-cta');
+    const duplicateMsg = document.getElementById('duplicate-review-msg');
+    const requestReviewBtn = document.getElementById('btn-request-review');
+    const reviewReasonInput = document.getElementById('duplicate-review-reason');
+
+    let duplicatePayload = null;
+
+    function showError(message) {
+        alertBox.textContent = message || 'Ocurrio un error.';
+        alertBox.classList.remove('d-none');
+    }
+
+    function hideError() {
+        alertBox.classList.add('d-none');
+        alertBox.textContent = '';
+    }
+
+    function formatPhoneValue(raw) {
+        const digits = String(raw || '').replace(/\D/g, '').slice(0, 10);
+        if (!digits) return '';
+        if (digits.length <= 3) return '(' + digits;
+        if (digits.length <= 6) return '(' + digits.slice(0, 3) + ')' + digits.slice(3);
+        return '(' + digits.slice(0, 3) + ')' + digits.slice(3, 6) + '-' + digits.slice(6);
+    }
+
+    function attachPhoneMask(selector) {
+        const input = form.querySelector(selector);
+        if (!input) return;
+        const applyMask = () => { input.value = formatPhoneValue(input.value); };
+        input.addEventListener('input', applyMask);
+        input.addEventListener('blur', applyMask);
+        applyMask();
+    }
+
+    function digitsOnly(raw) {
+        return String(raw || '').replace(/\D/g, '');
+    }
+
+    function formatMoney(raw) {
+        const clean = String(raw || '').replace(/[^0-9.,]/g, '');
+        const normalized = clean.replace(/,/g, '');
+        const value = Number(normalized);
+        if (!Number.isFinite(value) || normalized === '') return '';
+        return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatKwh(raw) {
+        const cleaned = String(raw || '').replace(/[^0-9.,]/g, '');
+        const normalized = cleaned.replace(',', '.');
+        const value = Number(normalized);
+        if (!Number.isFinite(value) || normalized === '') return '';
+        return value.toFixed(3).replace('.', ',');
+    }
+
+    function attachMoneyMask(selector) {
+        const input = form.querySelector(selector);
+        if (!input) return;
+        const sanitize = () => {
+            const cleaned = String(input.value || '').replace(/[^0-9.]/g, '');
+            const parts = cleaned.split('.');
+            const integer = parts[0] || '';
+            const decimals = parts[1] ? parts[1].slice(0, 2) : '';
+            input.value = decimals ? (integer + '.' + decimals) : integer;
+        };
+        const applyMask = () => { input.value = formatMoney(input.value); };
+        input.addEventListener('input', sanitize);
+        input.addEventListener('blur', applyMask);
+        input.addEventListener('focus', () => {
+            input.value = String(input.value || '').replace(/[$,\s]/g, '');
+        });
+    }
+
+    function attachKwhMask(selector) {
+        const input = form.querySelector(selector);
+        if (!input) return;
+        const sanitize = () => {
+            const cleaned = String(input.value || '').replace(/[^0-9.,]/g, '');
+            const normalized = cleaned.replace(',', '.');
+            const parts = normalized.split('.');
+            const integer = parts[0] || '';
+            const decimals = parts[1] ? parts[1].slice(0, 3) : '';
+            const draft = decimals ? (integer + '.' + decimals) : integer;
+            input.value = draft.replace('.', ',');
+        };
+        const applyMask = () => { input.value = formatKwh(input.value); };
+        input.addEventListener('input', sanitize);
+        input.addEventListener('blur', applyMask);
+        input.addEventListener('focus', () => {
+            input.value = String(input.value || '').replace(',', '.');
+        });
+    }
+
+    function formatPostalCode(raw) {
+        const digits = digitsOnly(raw).slice(0, 9);
+        if (digits.length <= 5) return digits;
+        return digits.slice(0, 5) + '-' + digits.slice(5);
+    }
+
+    function attachPostalMask(selector) {
+        const input = form.querySelector(selector);
+        if (!input) return;
+        const applyMask = () => { input.value = formatPostalCode(input.value); };
+        input.addEventListener('input', applyMask);
+        input.addEventListener('blur', applyMask);
+        applyMask();
+    }
+
+    if (window.Cleave) {
+        if (form.querySelector('#id_customer_phone')) new Cleave('#id_customer_phone', { phone: true, phoneRegionCode: 'US' });
+        if (form.querySelector('#id_customer_phone2')) new Cleave('#id_customer_phone2', { phone: true, phoneRegionCode: 'US' });
+    }
+    attachPhoneMask('#id_customer_phone');
+    attachPhoneMask('#id_customer_phone2');
+    attachMoneyMask('#id_electricity_bill');
+    attachKwhMask('#id_system_size');
+    attachPostalMask('#id_customer_postal_code');
+
+    const monthLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const monthsGrid = document.getElementById('months-grid');
+    const consumoHistorialHidden = document.getElementById('id_consumo_historial');
+    const consumoPromedioInput = document.getElementById('id_consumo_promedio_kwh');
+    const systemSizeInput = document.getElementById('id_system_size');
+    const hspInput = document.getElementById('id_hsp');
+    const effInput = document.getElementById('id_eff');
+    const offsetInput = document.getElementById('id_offset');
+
+    function parseNum(v) {
+        const n = Number(String(v || '').replace(',', '.'));
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    function getMonthsValues() {
+        const values = [];
+        monthsGrid.querySelectorAll('input[data-month-idx]').forEach((el) => {
+            values.push(parseNum(el.value));
+        });
+        return values;
+    }
+
+    function recalcConsumption() {
+        const values = getMonthsValues().filter((v) => v > 0);
+        const avg = values.length ? (values.reduce((a, b) => a + b, 0) / values.length) : 0;
+        if (consumoPromedioInput) consumoPromedioInput.value = avg ? avg.toFixed(2) : '';
+
+        const hsp = parseNum(hspInput ? hspInput.value : 0);
+        const eff = parseNum(effInput ? effInput.value : 0);
+        const offset = parseNum(offsetInput ? offsetInput.value : 0);
+        if (avg > 0 && hsp > 0 && eff > 0 && offset > 0 && systemSizeInput) {
+            const kw = ((avg / 30) / (hsp * eff)) * offset;
+            systemSizeInput.value = formatKwh(kw);
+        }
+    }
+
+    function syncHistorialJson() {
+        if (!consumoHistorialHidden) return;
+        const values = getMonthsValues();
+        consumoHistorialHidden.value = JSON.stringify(values);
+    }
+
+    function buildMonthsGrid() {
+        if (!monthsGrid) return;
+        let initial = [];
+        try { initial = JSON.parse((consumoHistorialHidden && consumoHistorialHidden.value) || '[]'); } catch (e) { initial = []; }
+        monthsGrid.innerHTML = '';
+        monthLabels.forEach((label, idx) => {
+            const col = document.createElement('div');
+            col.className = 'month-cell';
+            const labelNode = document.createElement('div');
+            labelNode.className = 'consumo-month-label';
+            labelNode.textContent = label;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.min = '0';
+            input.className = 'form-control form-control-sm text-center';
+            input.dataset.monthIdx = String(idx);
+            input.value = initial[idx] || '';
+            input.addEventListener('input', function () { syncHistorialJson(); recalcConsumption(); });
+            col.appendChild(labelNode);
+            col.appendChild(input);
+            monthsGrid.appendChild(col);
+        });
+        syncHistorialJson();
+        recalcConsumption();
+    }
+
+    function applyInvoiceMode() {
+        const enabled = !!(useImages && useImages.checked);
+        if (pdfInput) {
+            // Factura PDF no es obligatoria para guardar.
+            pdfInput.required = false;
+            pdfInput.closest('div').classList.toggle('d-none', enabled);
+        }
+        if (img1Wrap) img1Wrap.classList.toggle('d-none', !enabled);
+        if (img2Wrap) img2Wrap.classList.toggle('d-none', !enabled);
+        if (img3Wrap) img3Wrap.classList.toggle('d-none', !enabled);
+        if (img4Wrap) img4Wrap.classList.toggle('d-none', !enabled);
+        if (page1Input) page1Input.required = enabled;
+        if (page2Input) page2Input.required = enabled;
+    }
+
+    if (useImages) useImages.addEventListener('change', applyInvoiceMode);
+    const clearPdfInput = form.querySelector('input[name="electricity_invoice_pdf-clear"]');
+    if (clearPdfInput) clearPdfInput.addEventListener('change', applyInvoiceMode);
+    applyInvoiceMode();
+
+    const captureBtn = document.getElementById('btn-capture-coords');
+    if (captureBtn) {
+        captureBtn.addEventListener('click', function () {
+            if (!navigator.geolocation) {
+                showError('Tu navegador no soporta geolocalizacion.');
+                return;
+            }
+            const lat = form.querySelector('#id_customer_latitude, #id_latitude, [name="customer_latitude"], [name="latitude"]');
+            const lon = form.querySelector('#id_customer_longitude, #id_longitude, [name="customer_longitude"], [name="longitude"]');
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    if (lat) {
+                        lat.value = pos.coords.latitude.toFixed(7);
+                        lat.dispatchEvent(new Event('input', { bubbles: true }));
+                        lat.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (lon) {
+                        lon.value = pos.coords.longitude.toFixed(7);
+                        lon.dispatchEvent(new Event('input', { bubbles: true }));
+                        lon.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (!lat || !lon) {
+                        showError('No se encontraron los campos de latitud/longitud en el formulario.');
+                    }
+                },
+                function (err) {
+                    if (err && err.code === 1) {
+                        showError('Permiso de ubicacion denegado. Habilitalo en el navegador y vuelve a intentar.');
+                        return;
+                    }
+                    if (err && err.code === 2) {
+                        showError('No se pudo obtener tu ubicacion actual.');
+                        return;
+                    }
+                    if (err && err.code === 3) {
+                        showError('Tiempo agotado al capturar coordenadas. Intenta nuevamente.');
+                        return;
+                    }
+                    showError('No fue posible capturar coordenadas.');
+                },
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            );
+        });
+    }
+
+    function setOcrState(kind, textOrHtml) {
+        ocrBadge.className = 'badge me-2';
+        if (kind === 'ok') {
+            ocrBadge.classList.add('text-bg-success');
+            ocrBadge.textContent = 'OCR procesado';
+        } else if (kind === 'error') {
+            ocrBadge.classList.add('text-bg-danger');
+            ocrBadge.textContent = 'Error OCR';
+        } else if (kind === 'loading') {
+            ocrBadge.classList.add('text-bg-warning');
+            ocrBadge.textContent = 'Procesando OCR...';
+        } else {
+            ocrBadge.classList.add('text-bg-secondary');
+            ocrBadge.textContent = 'OCR pendiente';
+        }
+        document.getElementById('ocr-status-text').textContent = kind === 'ok'
+            ? 'Verifica y ajusta los datos antes de guardar.'
+            : kind === 'error'
+                ? 'Error OCR'
+                : kind === 'loading'
+                    ? 'Procesando OCR...'
+                    : 'Sin procesar';
+        if (kind === 'ok') {
+            ocrChecklist.innerHTML = textOrHtml || '';
+        } else {
+            ocrChecklist.textContent = textOrHtml || '';
+        }
+    }
+
+    function fillExtracted(extracted) {
+        const mapping = {
+            customer_name: '#id_customer_name',
+            customer_address: '#id_customer_address',
+            customer_city: '#id_customer_city',
+            customer_postal_code: '#id_customer_postal_code',
+            customer_country: '#id_customer_country',
+            invoice_name: '#id_invoice_name',
+            account_number: '#id_account_number',
+            meter_number: '#id_meter_number',
+            location_id: '#id_location_id',
+            electricity_bill: '#id_electricity_bill',
+            consumo_promedio_kwh: '#id_consumo_promedio_kwh',
+            system_size: '#id_system_size',
+            hsp: '#id_hsp',
+            eff: '#id_eff',
+            offset: '#id_offset',
+            id_consumo_historial: '#id_consumo_historial',
+        };
+        Object.entries(mapping).forEach(([key, selector]) => {
+            const input = form.querySelector(selector);
+            if (!input || extracted[key] === undefined || extracted[key] === null || extracted[key] === '') return;
+            if ((selector === '#id_customer_city' || selector === '#id_customer_country') && input.tagName === 'SELECT') {
+                const options = Array.from(input.options).map((opt) => opt.value);
+                if (options.includes(String(extracted[key]))) input.value = String(extracted[key]);
+                return;
+            }
+            input.value = extracted[key];
+        });
+        if (extracted.id_consumo_historial && consumoHistorialHidden) {
+            consumoHistorialHidden.value = typeof extracted.id_consumo_historial === 'string'
+                ? extracted.id_consumo_historial
+                : JSON.stringify(extracted.id_consumo_historial);
+            buildMonthsGrid();
+        }
+    }
+
+    function renderChecklist(checklist) {
+        const labels = {
+            invoice_name: 'Nombre en factura',
+            account_number: 'Numero de cuenta',
+            meter_number: 'Numero de contador',
+            location_id: 'ID localidad',
+            electricity_bill: 'Monto factura',
+            consumo_promedio_kwh: 'Consumo promedio',
+            id_consumo_historial: 'Historial de consumo',
+        };
+        const rows = [];
+        Object.entries(labels).forEach(([key, label]) => {
+            if ((checklist || {})[key]) {
+                rows.push('<div><span class="text-success fw-semibold">OK</span> ' + label + '</div>');
+            } else {
+                rows.push('<div><span class="text-warning fw-semibold">FALTA</span> ' + label + '</div>');
+            }
+        });
+        return rows.join('');
+    }
+
+    function parseInvoicePreview() {
+        hideError();
+        duplicateCta.classList.add('d-none');
+        duplicatePayload = null;
+        const hasPdf = pdfInput && pdfInput.files && pdfInput.files[0];
+        const hasImg1 = page1Input && page1Input.files && page1Input.files[0];
+        const hasImg2 = page2Input && page2Input.files && page2Input.files[0];
+        if (!hasPdf && !(hasImg1 || hasImg2)) return;
+
+        const fd = new FormData();
+        if (hasPdf) fd.append('electricity_invoice_pdf', pdfInput.files[0]);
+        if (hasImg1) fd.append('electricity_invoice_page1_img', page1Input.files[0]);
+        if (hasImg2) fd.append('electricity_invoice_page2_img', page2Input.files[0]);
+        if (page3Input && page3Input.files && page3Input.files[0]) fd.append('electricity_invoice_page3_img', page3Input.files[0]);
+        if (page4Input && page4Input.files && page4Input.files[0]) fd.append('electricity_invoice_page4_img', page4Input.files[0]);
+        fd.append('csrfmiddlewaretoken', csrf);
+        if (leadId && leadId.value) fd.append('lead_id', leadId.value);
+        if (languageInput && languageInput.value) fd.append('electricity_invoice_language', languageInput.value);
+
+        setOcrState('loading', 'Extrayendo campos...');
+        fetch('{{ parse_invoice_preview_url }}', {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(async (r) => ({ status: r.status, payload: await r.json() }))
+        .then(({ status, payload }) => {
+            if (status >= 200 && status < 300 && payload.success) {
+                fillExtracted(payload.data || payload.extracted || {});
+                setOcrState('ok', renderChecklist(payload.checklist || {}));
+                recalcConsumption();
+                return;
+            }
+            setOcrState('error', payload.error || payload.message || 'No se pudo procesar OCR.');
+            if ((payload.duplicate_invoice || payload.duplicate_service_keys) && payload.can_request_review) {
+                duplicatePayload = payload;
+                duplicateMsg.textContent = payload.error || payload.message || 'Factura duplicada detectada.';
+                duplicateCta.classList.remove('d-none');
+            }
+        })
+        .catch(() => {
+            setOcrState('error', 'Error inesperado procesando OCR.');
+        });
+    }
+
+    if (pdfInput) {
+        pdfInput.addEventListener('change', parseInvoicePreview);
+    }
+    if (page1Input) page1Input.addEventListener('change', parseInvoicePreview);
+    if (page2Input) page2Input.addEventListener('change', parseInvoicePreview);
+    if (page3Input) page3Input.addEventListener('change', parseInvoicePreview);
+    if (page4Input) page4Input.addEventListener('change', parseInvoicePreview);
+
+    if (requestReviewBtn) {
+        requestReviewBtn.addEventListener('click', function () {
+            if (!duplicatePayload) return;
+            const fd = new FormData();
+            fd.append('csrfmiddlewaretoken', csrf);
+            fd.append('reason', (reviewReasonInput && reviewReasonInput.value ? reviewReasonInput.value : 'Duplicado detectado en OCR'));
+            if (duplicatePayload.duplicate_lead_id) fd.append('duplicate_lead_id', String(duplicatePayload.duplicate_lead_id));
+            if (leadId && leadId.value) fd.append('lead_id', leadId.value);
+            if (pdfInput && pdfInput.files && pdfInput.files[0]) fd.append('electricity_invoice_pdf', pdfInput.files[0]);
+            if (page1Input && page1Input.files && page1Input.files[0]) fd.append('electricity_invoice_page1_img', page1Input.files[0]);
+            if (page2Input && page2Input.files && page2Input.files[0]) fd.append('electricity_invoice_page2_img', page2Input.files[0]);
+            if (page3Input && page3Input.files && page3Input.files[0]) fd.append('electricity_invoice_page3_img', page3Input.files[0]);
+            if (page4Input && page4Input.files && page4Input.files[0]) fd.append('electricity_invoice_page4_img', page4Input.files[0]);
+            if (languageInput && languageInput.value) fd.append('electricity_invoice_language', languageInput.value);
+
+            fetch('{{ duplicate_request_url }}', {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then((r) => r.json())
+            .then((payload) => {
+                if (payload.success) {
+                    duplicateCta.classList.add('d-none');
+                    showError('Solicitud de revision enviada al Partner.');
+                    alertBox.classList.remove('alert-danger');
+                    alertBox.classList.add('alert-info');
+                } else {
+                    showError(payload.message || 'No se pudo enviar la solicitud.');
+                }
+            });
+        });
+    }
+
+    ['#id_hsp', '#id_eff', '#id_offset'].forEach((sel) => {
+        const el = form.querySelector(sel);
+        if (el) el.addEventListener('input', recalcConsumption);
+    });
+
+    form.addEventListener('submit', function () {
+        syncHistorialJson();
+        const bill = form.querySelector('#id_electricity_bill');
+        const size = form.querySelector('#id_system_size');
+        if (bill) bill.value = String(bill.value || '').replace(/[$,\s]/g, '');
+        if (size) size.value = String(size.value || '').replace(',', '.').replace(/\s/g, '');
+    });
+
+    buildMonthsGrid();
+
+    if (hspInput && !String(hspInput.value || '').trim()) hspInput.value = '4.20';
+    if (effInput && !String(effInput.value || '').trim()) effInput.value = '0.80';
+    if (offsetInput && !String(offsetInput.value || '').trim()) offsetInput.value = '1.00';
+    recalcConsumption();
+})();
+</script>

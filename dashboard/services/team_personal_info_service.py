@@ -95,6 +95,8 @@ def _ancestor_names(profile: UserProfile | None) -> dict[str, str]:
         "consultant_name": "",
         "teamleader_name": "",
         "manager_name": "",
+        "senior_manager_name": "",
+        "elite_manager_name": "",
         "executive_manager_name": "",
         "promanager_name": "",
         "jr_partner_name": "",
@@ -112,8 +114,10 @@ def _ancestor_names(profile: UserProfile | None) -> dict[str, str]:
             names["teamleader_name"] = display_name
         elif role == RoleCode.MANAGER and not names["manager_name"]:
             names["manager_name"] = display_name
-        elif role in {RoleCode.SENIOR_MANAGER, RoleCode.ELITE_MANAGER} and not names["executive_manager_name"]:
-            names["executive_manager_name"] = display_name
+        elif role == RoleCode.SENIOR_MANAGER and not names["senior_manager_name"]:
+            names["senior_manager_name"] = display_name
+        elif role == RoleCode.ELITE_MANAGER and not names["elite_manager_name"]:
+            names["elite_manager_name"] = display_name
         elif role == RoleCode.BUSINESS_MANAGER and not names["promanager_name"]:
             names["promanager_name"] = display_name
         elif role == RoleCode.JR_PARTNER and not names["jr_partner_name"]:
@@ -124,6 +128,8 @@ def _ancestor_names(profile: UserProfile | None) -> dict[str, str]:
             break
         manager_user = current.manager
         current = getattr(manager_user, "profile", None)
+    # Campo legado para compatibilidad con vistas antiguas.
+    names["executive_manager_name"] = names["senior_manager_name"] or names["elite_manager_name"]
     return names
 
 
@@ -254,6 +260,8 @@ def get_salesrep_profiles(scope_profile_id: int, all_requested: bool = False) ->
                 "consultant_name": ancestor["consultant_name"],
                 "teamleader_name": ancestor["teamleader_name"],
                 "manager_name": ancestor["manager_name"],
+                "senior_manager_name": ancestor["senior_manager_name"],
+                "elite_manager_name": ancestor["elite_manager_name"],
                 "executive_manager_name": ancestor["executive_manager_name"],
                 "promanager_name": ancestor["promanager_name"],
                 "jr_partner_name": ancestor["jr_partner_name"],

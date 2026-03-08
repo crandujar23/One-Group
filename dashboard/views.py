@@ -600,6 +600,13 @@ def _solar_segment_quick_links():
             "url": reverse("dashboard:solar_sale_commercial"),
             "external": False,
         },
+        {
+            "label": "Genera Clientes",
+            "description": "Crea clientes demo o de prueba para agilizar operaciones.",
+            "icon": "bi-person-plus",
+            "url": reverse("dashboard:solar_generate_clients"),
+            "external": False,
+        },
     ]
 
 
@@ -942,6 +949,26 @@ def solar_sale_commercial_iframe(request):
             "sales_status_chart": _status_chart_data(sales),
             "daily_sales_chart": _daily_sales_chart_data(sales),
             "recent_sales": sales[:10],
+        },
+    )
+
+
+@login_required
+def solar_generate_clients_page(request):
+    profile = _profile(request.user)
+    sales_rep = _sales_rep(request.user)
+    solar_unit = BusinessUnit.objects.filter(code="solar-home-power").first()
+
+    if not solar_unit:
+        return HttpResponseForbidden("La unidad de negocio no esta disponible.")
+    if not _can_access_business_unit(request.user, profile, sales_rep, solar_unit):
+        return HttpResponseForbidden("No autorizado")
+
+    return render(
+        request,
+        "dashboard/solar_generate_clients.html",
+        {
+            "title": "Genera Clientes",
         },
     )
 
@@ -1525,6 +1552,16 @@ def salesrep_profile_api(request):
                 visible_partner_rate = row.get("partner_rate") or 0
             elif viewer_is_partner and row_partner_name and row_partner_name == viewer_display_name:
                 visible_partner_rate = row.get("partner_rate") or 0
+            senior_manager_name = (row.get("senior_manager_name") or "").strip()
+            elite_manager_name = (row.get("elite_manager_name") or "").strip()
+            legacy_executive_name = (row.get("executive_manager_name") or "").strip()
+            senior_manager_rate = row.get("senior_manager_rate") or 0
+            elite_manager_rate = row.get("elite_manager_rate") or 0
+            if not senior_manager_name and not elite_manager_name and legacy_executive_name:
+                if senior_manager_rate >= elite_manager_rate:
+                    senior_manager_name = legacy_executive_name
+                else:
+                    elite_manager_name = legacy_executive_name
             data.append(
                 {
                     "salesrep_id": salesrep_id,
@@ -1539,6 +1576,8 @@ def salesrep_profile_api(request):
                     "consultant_name": row.get("consultant_name") or "",
                     "teamleader_name": (row.get("teamleader_name") or "") if can_view_solar_advisor else "",
                     "manager_name": (row.get("manager_name") or "") if can_view_manager else "",
+                    "senior_manager_name": senior_manager_name if can_view_senior_manager else "",
+                    "elite_manager_name": elite_manager_name if can_view_elite_manager else "",
                     "executive_manager_name": (row.get("executive_manager_name") or "") if (can_view_senior_manager or can_view_elite_manager) else "",
                     "promanager_name": (row.get("promanager_name") or "") if can_view_business_manager else "",
                     "jr_partner_name": (row.get("jr_partner_name") or "") if can_view_jr_partner else "",
@@ -1546,8 +1585,8 @@ def salesrep_profile_api(request):
                     "solar_consultant_rate": row.get("solar_consultant_rate") or 0,
                     "solar_advisor_rate": (row.get("solar_advisor_rate") or 0) if can_view_solar_advisor else 0,
                     "manager_rate": (row.get("manager_rate") or 0) if can_view_manager else 0,
-                    "senior_manager_rate": (row.get("senior_manager_rate") or 0) if can_view_senior_manager else 0,
-                    "elite_manager_rate": (row.get("elite_manager_rate") or 0) if can_view_elite_manager else 0,
+                    "senior_manager_rate": senior_manager_rate if can_view_senior_manager else 0,
+                    "elite_manager_rate": elite_manager_rate if can_view_elite_manager else 0,
                     "business_manager_rate": (row.get("business_manager_rate") or 0) if can_view_business_manager else 0,
                     "jr_partner_rate": (row.get("jr_partner_rate") or 0) if can_view_jr_partner else 0,
                     # Política de privacidad: solo el propio Partner puede ver su porcentaje.

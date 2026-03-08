@@ -1,5 +1,7 @@
 from django.urls import path, re_path
 
+from dashboard import deals_views
+from dashboard import leads_views
 from dashboard import views
 
 app_name = "dashboard"
@@ -14,10 +16,11 @@ urlpatterns = [
     path("solar/email/", views.email_iframe, name="email_iframe"),
     path("solar/residencial/", views.solar_residential_iframe, name="solar_residential"),
     path("solar/comercial/", views.solar_commercial_iframe, name="solar_commercial"),
-    path("solar/cliente-residencial/", views.solar_client_residential_iframe, name="solar_client_residential"),
-    path("solar/venta-residencial/", views.solar_sale_residential_iframe, name="solar_sale_residential"),
+    path("solar/cliente-residencial/", leads_views.crm_leads_list_page, name="solar_client_residential"),
+    path("solar/venta-residencial/", deals_views.crm_deals_list_page, name="solar_sale_residential"),
     path("solar/cliente-comercial/", views.solar_client_commercial_iframe, name="solar_client_commercial"),
     path("solar/venta-comercial/", views.solar_sale_commercial_iframe, name="solar_sale_commercial"),
+    path("solar/genera-clientes/", leads_views.crm_lead_generation_private, name="solar_generate_clients"),
     path("techo/", views.business_unit_overview, {"unit_key": "techo"}, name="unit_techo"),
     path("sunvida/", views.business_unit_overview, {"unit_key": "sunvida"}, name="unit_sunvida"),
     path("cash-d/", views.business_unit_overview, {"unit_key": "cash-d"}, name="unit_cash_d"),
@@ -35,6 +38,28 @@ urlpatterns = [
     path("gestion-clientes/", views.client_management, name="client_management"),
     path("informacion-asociados/", views.associates_info, name="associates_info"),
     path("apps/crm/salesteam/", views.apps_crm_sales_team_view, name="apps_crm_sales_team_view"),
+    path("apps/crm/lead-generation", leads_views.crm_lead_generation_private, name="crm_lead_generation_private"),
+    path("apps/crm/lead-generation/public", leads_views.crm_lead_generation_public, name="crm_lead_generation_public"),
+    path("apps/crm/leads_qrcode", leads_views.crm_leads_qrcode, name="crm_leads_qrcode"),
+    path("apps/crm/deals", deals_views.crm_deals_list_page, name="crm_deals_list"),
+    path("apps/api/deals-details/", deals_views.crm_deals_details_api, name="crm_deals_details_api"),
+    path("apps/api/deals-details/<int:deal_id>/", deals_views.crm_deal_delete_api, name="crm_deal_delete_api"),
+    path("apps/crm/deals/<int:deal_id>/update/", deals_views.crm_deal_update_modal, name="crm_deal_update_modal"),
+    path("apps/crm/leads", leads_views.crm_leads_list_page, name="crm_leads_list"),
+    path("apps/api/leads/", leads_views.crm_leads_api, name="crm_leads_api"),
+    path("apps/crm/leads/create/", leads_views.crm_lead_create_modal, name="crm_lead_create_modal"),
+    path("apps/crm/leads/fill-table/", leads_views.crm_lead_fill_table_modal, name="crm_lead_fill_table_modal"),
+    path("apps/crm/leads/<int:lead_id>/update/", leads_views.crm_lead_update_modal, name="crm_lead_update_modal"),
+    path("apps/crm/leads/<int:lead_id>/", leads_views.crm_lead_detail, name="crm_lead_detail"),
+    path("apps/crm/leads/<int:lead_id>/delete/", leads_views.crm_lead_delete_modal, name="crm_lead_delete_modal"),
+    path("apps/crm/leads/<int:lead_id>/notes/create/", leads_views.crm_lead_note_create, name="crm_lead_note_create"),
+    path("apps/crm/leads/log_activity/", leads_views.crm_leads_log_activity, name="crm_leads_log_activity"),
+    path("apps/crm/leads/parse-invoice-preview/", leads_views.crm_leads_parse_invoice_preview, name="crm_leads_parse_invoice_preview"),
+    path("apps/crm/leads/duplicate-review/request/", leads_views.crm_duplicate_review_request, name="crm_duplicate_review_request"),
+    path("apps/crm/leads/duplicate-review/pending/", leads_views.crm_duplicate_review_pending, name="crm_duplicate_review_pending"),
+    path("apps/crm/leads/duplicate-review/<int:request_id>/action/", leads_views.crm_duplicate_review_action, name="crm_duplicate_review_action"),
+    path("apps/api/leads/<int:lead_id>/assign_lead/", leads_views.crm_assign_lead_api, name="crm_assign_lead_api"),
+    path("apps/api/leads/<int:lead_id>/accept_lead/", leads_views.crm_accept_lead_api, name="crm_accept_lead_api"),
     path("apps/crm/salesteam-graph", views.apps_crm_salesteam_graph, name="apps_crm_salesteam_graph"),
     path("apps/crm/salesteam-graph-source", views.apps_crm_salesteam_graph_source, name="apps_crm_salesteam_graph_source"),
     path("apps/crm/salesteam-personal/", views.apps_crm_sales_team_personal_info_view, name="apps_crm_sales_team_personal_info_view"),

@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% block title %}Pipeline de Deals{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+<style>
+.deals-toolbar{border:1px solid #dbe3ea;border-radius:.75rem;background:#f8fafc}
+#dealModal .modal-dialog{max-width:560px}
+.upload-note{font-size:.78rem;color:#64748b}
+.adjudication-pill{font-size:.75rem;padding:.2rem .45rem;border-radius:.45rem}
+</style>
+{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Pipeline de Deals</h1>
+            <p class="mb-0 opacity-75">Gestion operativa de adjudicacion y seguimiento residencial.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'dashboard:unit_solar' %}">Volver</a>
+    </div>
+</section>
+
+{% if can_reassign_deals_ui %}
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-3">Subir informe de adjudicacion</h2>
+    <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="deal_kind" value="{{ deal_kind }}">
+        <div class="col-lg-4">
+            <label class="form-label mb-1">{{ upload_form.report_file.label }}</label>
+            {{ upload_form.report_file }}
+            {% if upload_form.report_file.errors %}<div class="text-danger small">{{ upload_form.report_file.errors|join:", " }}</div>{% endif %}
+            <div class="upload-note mt-1">Formato .xlsx recomendado.</div>
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label mb-1">{{ upload_form.sheet_name.label }}</label>
+            {{ upload_form.sheet_name }}
+        </div>
+        <div class="col-lg-3">
+            <div class="form-check mb-2">
+                {{ upload_form.dry_run }}
+                <label class="form-check-label" for="{{ upload_form.dry_run.id_for_label }}">{{ upload_form.dry_run.label }}</label>
+            </div>
+        </div>
+        <div class="col-lg-2 d-grid">
+            <button class="btn btn-primary btn-sm" type="submit">Procesar</button>
+        </div>
+    </form>
+    <p class="upload-note mt-3 mb-0">Mapeo por columnas: SERVICE CONTRACT+/PROPOSAL ID, SALES REP. NAME, DATE APPROVED, EPC PRICED, SYSTEM SIZE DC, EPC BASE, EPC TABLA, AJUSTE POR EPC.</p>
+</section>
+{% endif %}
+
+{% if upload_summary %}
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-2">Resumen de importacion</h2>
+    <div class="row g-2">
+        <div class="col-md-2"><span class="badge text-bg-light border w-100">Procesadas: {{ upload_summary.processed }}</span></div>
+        <div class="col-md-2"><span class="badge text-bg-success w-100">Creadas: {{ upload_summary.created }}</span></div>
+        <div class="col-md-2"><span class="badge text-bg-primary w-100">Actualizadas: {{ upload_summary.updated }}</span></div>
+        <div class="col-md-2"><span class="badge text-bg-warning w-100">Omitidas: {{ upload_summary.skipped }}</span></div>
+    </div>
+    {% if upload_summary.warnings %}
+    <div class="mt-2"><strong>Warnings:</strong><ul class="mb-0">{% for item in upload_summary.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>
+    {% if upload_summary.warnings_hidden %}<div class="small text-muted mt-1">...{{ upload_summary.warnings_hidden }} warning(s) ocultos.</div>{% endif %}
+    {% endif %}
+    {% if upload_summary.errors %}
+    <div class="mt-2 text-danger"><strong>Errores:</strong><ul class="mb-0">{% for item in upload_summary.errors %}<li>{{ item }}</li>{% endfor %}</ul></div>
+    {% if upload_summary.errors_hidden %}<div class="small text-muted mt-1">...{{ upload_summary.errors_hidden }} error(es) ocultos.</div>{% endif %}
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="row g-3 mb-3 reveal reveal-delay-1">
+    <div class="col-md-4"><article class="kpi-card p-3 h-100"><p class="kpi-label">Deals en tu bandeja</p><p class="kpi-value" id="kpi-total">{{ kpis.total }}</p><p class="mb-0 small text-muted">Total de oportunidades</p></article></div>
+    <div class="col-md-4"><article class="kpi-card p-3 h-100"><p class="kpi-label">Valor en Pipeline</p><p class="kpi-value" id="kpi-pipeline">{{ kpis.total_pipeline|floatformat:2 }}</p><p class="mb-0 small text-muted">EPC estimado (USD)</p></article></div>
+    <div class="col-md-4"><article class="kpi-card p-3 h-100"><p class="kpi-label">Cierres este mes</p><p class="kpi-value" id="kpi-month">{{ kpis.month_total }}</p><p class="mb-0 small text-muted" id="kpi-stage-summary">Sin registros por etapa.</p></article></div>
+</section>
+
+<section class="deals-toolbar p-3 mb-3 reveal reveal-delay-2">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label mb-1" for="filter-stage">Filtrar por etapa</label>
+            <select id="filter-stage" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                {% for value, label in stages %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label mb-1" for="filter-month">Filtrar por mes de cierre</label>
+            <select id="filter-month" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for month in month_options %}
+                <option value="{{ month.value }}">{{ month.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label mb-1" for="filter-search">Busqueda rapida</label>
+            <input id="filter-search" class="form-control form-control-sm" type="search" placeholder="Nombre, correo o etapa">
+        </div>
+        <div class="col-md-2 d-grid">
+            <button id="btn-reset-filters" class="btn btn-outline-secondary btn-sm">Reiniciar</button>
+        </div>
+    </div>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <div class="table-responsive">
+        <table id="deals-table" class="table table-modern table-striped align-middle w-100">
+            <thead>
+            <tr>
+                <th>Sales Rep. Name</th>
+                {% if can_reassign_deals_ui %}<th>Adjudicacion</th>{% endif %}
+                <th>Cliente</th>
+                <th>Proposal ID</th>
+                <th>Service Contract</th>
+                <th>Telefono</th>
+                <th>Email</th>
+                <th>Tamaño Sistema</th>
+                <th>Precio EPC</th>
+                <th>EPC Base</th>
+                <th>EPC Tabla</th>
+                <th>Ajuste EPC</th>
+                <th>Fecha Venta</th>
+                <th>Etapa</th>
+                <th>Fecha de Aprobacion</th>
+                <th>Fecha de Firma</th>
+                <th>Fecha de instalacion</th>
+                <th>Acciones</th>
+            </tr>
+            </thead>
+        </table>
+    </div>
+</section>
+
+<div class="modal fade" id="dealModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Actualizar adjudicacion</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="dealModalBody"><div class="text-muted small">Cargando...</div></div>
+        </div>
+    </div>
+</div>
+
+<script id="deals-config" type="application/json">{
+    "apiUrl":"{% url 'dashboard:crm_deals_details_api' %}",
+    "dealKind":"{{ deal_kind }}",
+    "updateBase":"{% url 'dashboard:crm_deal_update_modal' 0 %}",
+    "deleteBase":"{% url 'dashboard:crm_deal_delete_api' 0 %}",
+    "csrfToken":"{{ csrf_token }}",
+    "canReassign":{{ can_reassign_deals_ui|yesno:'true,false' }},
+    "canDelete":{{ can_delete_deals_ui|yesno:'true,false' }}
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+(function () {
+    const $ = window.jQuery;
+    if (!$ || !$.fn.DataTable) return;
+    const cfg = JSON.parse(document.getElementById('deals-config').textContent || '{}');
+    const modalEl = document.getElementById('dealModal');
+    const modalBody = document.getElementById('dealModalBody');
+    const modal = window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
+    const canReassign = !!cfg.canReassign;
+    const columns = [
+        { data: 'salesrep_name' },
+    ];
+    if (canReassign) {
+        columns.push({
+            data: 'adjudication_label',
+            render: (d) => {
+                const assigned = String(d || '').toLowerCase() === 'asignada';
+                const cls = assigned ? 'text-bg-success' : 'text-bg-warning';
+                return '<span class="badge ' + cls + ' adjudication-pill">' + (d || 'Pendiente') + '</span>';
+            }
+        });
+    }
+    columns.push(
+        { data: 'customer_name', defaultContent: '—' },
+        { data: 'proposal_id', defaultContent: '—' },
+        { data: 'sunrun_service_contract_id', defaultContent: '—' },
+        { data: 'customer_phone', render: (d) => d ? '<a href="tel:' + d + '">' + d + '</a>' : '—' },
+        { data: 'customer_email', render: (d) => d ? '<a href="mailto:' + d + '">' + d + '</a>' : '—' },
+        { data: 'system_size', render: (d) => d ? Number(d).toFixed(3) : '—' },
+        { data: 'epc_price', render: (d) => d ? Number(d).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' },
+        { data: 'epc_base', render: (d) => d ? Number(d).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' },
+        { data: 'epc_table', render: (d) => d ? Number(d).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' },
+        { data: 'epc_adjustment', render: (d) => d ? Number(d).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—' },
+        { data: 'closing_date', defaultContent: '' },
+        { data: 'stage_display', defaultContent: '—' },
+        { data: 'sr_signoff_date', defaultContent: '' },
+        { data: 'customer_sign_off_date', defaultContent: '' },
+        { data: 'final_completion_date', defaultContent: '' },
+        {
+            data: null, orderable: false, searchable: false,
+            render: (d, t, row) => {
+                const actions = [];
+                if (row.can_edit) {
+                    actions.push('<button class="btn btn-sm btn-outline-primary js-open-update" data-id="' + row.id + '" title="Adjudicar/Reasignar"><i class="bi bi-pencil-square"></i></button>');
+                }
+                if (row.can_delete) {
+                    actions.push('<button class="btn btn-sm btn-outline-danger js-delete" data-id="' + row.id + '" title="Eliminar"><i class="bi bi-trash"></i></button>');
+                }
+                return actions.join(' ');
+            }
+        }
+    );
+
+    const closingDateIndex = canReassign ? 12 : 11;
+    const table = $('#deals-table').DataTable({
+        processing: true,
+        responsive: false,
+        order: [[closingDateIndex, 'desc']],
+        dom: 'Bfrtip',
+        buttons: ['copy', 'excel', 'print'],
+        ajax: {
+            url: cfg.apiUrl,
+            timeout: 15000,
+            data: function (d) {
+                d.deal_kind = cfg.dealKind;
+                d.stage = document.getElementById('filter-stage').value || '';
+                d.month = document.getElementById('filter-month').value || '';
+                d.search = document.getElementById('filter-search').value || '';
+            },
+            dataSrc: function (json) {
+                const k = json.kpis || {};
+                document.getElementById('kpi-total').textContent = k.total || 0;
+                document.getElementById('kpi-pipeline').textContent = Number(k.total_pipeline || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+                document.getElementById('kpi-month').textContent = k.month_total || 0;
+                const stageSummary = Object.entries(k.stage_counts || {}).map(([label, value]) => label + ': ' + value).join(' | ');
+                document.getElementById('kpi-stage-summary').textContent = stageSummary || 'Sin registros por etapa.';
+                return json.data || [];
+            },
+            error: function () {
+                Swal.fire('Error', 'No fue posible cargar el pipeline. Reintenta.', 'error');
+            }
+        },
+        columns: columns,
+        language: {
+            zeroRecords: 'No data available in table',
+            processing: 'Cargando...'
+        }
+    });
+
+    function idUrl(base, id) { return String(base).replace('/0/', '/' + id + '/'); }
+    function reload() { table.ajax.reload(null, false); }
+
+    ['filter-stage', 'filter-month'].forEach((id) => document.getElementById(id).addEventListener('change', reload));
+    document.getElementById('filter-search').addEventListener('input', reload);
+    document.getElementById('btn-reset-filters').addEventListener('click', function () {
+        document.getElementById('filter-stage').value = '';
+        document.getElementById('filter-month').value = '';
+        document.getElementById('filter-search').value = '';
+        reload();
+    });
+
+    document.addEventListener('click', function (event) {
+        const updateBtn = event.target.closest('.js-open-update');
+        if (updateBtn) {
+            const url = idUrl(cfg.updateBase, updateBtn.getAttribute('data-id')) + '?deal_kind=' + encodeURIComponent(cfg.dealKind);
+            modalBody.innerHTML = '<div class="text-muted small">Cargando...</div>';
+            if (modal) modal.show();
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then((r) => r.text())
+                .then((html) => { modalBody.innerHTML = html; })
+                .catch(() => { modalBody.innerHTML = '<div class="alert alert-danger mb-0">No se pudo cargar el formulario.</div>'; });
+            return;
+        }
+
+        const deleteBtn = event.target.closest('.js-delete');
+        if (deleteBtn) {
+            const id = deleteBtn.getAttribute('data-id');
+            Swal.fire({
+                title: 'Eliminar deal',
+                text: 'Esta accion no se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Si, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((res) => {
+                if (!res.isConfirmed) return;
+                fetch(idUrl(cfg.deleteBase, id) + '?deal_kind=' + encodeURIComponent(cfg.dealKind), {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': cfg.csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then((r) => r.json())
+                .then((payload) => {
+                    if (!payload.success) throw new Error(payload.message || 'Error');
+                    Swal.fire('Eliminado', payload.message || 'Deal eliminado.', 'success');
+                    reload();
+                })
+                .catch((err) => Swal.fire('Error', String(err.message || err), 'error'));
+            });
+        }
+    });
+
+    modalEl.addEventListener('submit', function (event) {
+        const form = event.target.closest('form.js-deal-update-form');
+        if (!form) return;
+        event.preventDefault();
+        const action = form.getAttribute('action');
+        const body = new FormData(form);
+        fetch(action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': cfg.csrfToken },
+            body: body
+        })
+        .then((r) => r.json().then((payload) => ({ ok: r.ok, payload })))
+        .then(({ ok, payload }) => {
+            if (!ok || !payload.success) {
+                const errors = payload.errors || {};
+                form.querySelectorAll('.invalid-feedback').forEach((node) => node.remove());
+                Object.keys(errors).forEach((key) => {
+                    const input = form.querySelector('[name="' + key + '"]');
+                    if (!input) return;
+                    input.classList.add('is-invalid');
+                    const feedback = document.createElement('div');
+                    feedback.className = 'invalid-feedback d-block';
+                    feedback.textContent = (errors[key] || []).join(', ');
+                    input.insertAdjacentElement('afterend', feedback);
+                });
+                return;
+            }
+            if (modal) modal.hide();
+            reload();
+            Swal.fire('Guardado', 'Deal actualizado correctamente.', 'success');
+        })
+        .catch(() => Swal.fire('Error', 'No se pudo guardar la adjudicacion.', 'error'));
+    });
+})();
+</script>
+{% endblock %}

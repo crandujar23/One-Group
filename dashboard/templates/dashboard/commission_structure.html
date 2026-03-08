@@ -256,13 +256,13 @@
     }
     if (cfg.showSeniorManager) {
         columns.push(
-            { data: 'executive_manager_name', render: (d) => d || '—' },
+            { data: 'senior_manager_name', render: (d) => d || '—' },
             { data: 'senior_manager_rate', render: pct }
         );
     }
     if (cfg.showEliteManager) {
         columns.push(
-            { data: 'executive_manager_name', render: (d) => d || '—' },
+            { data: 'elite_manager_name', render: (d) => d || '—' },
             { data: 'elite_manager_rate', render: pct }
         );
     }

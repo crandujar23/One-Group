@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Genera Clientes{% endblock %}
+{% block content %}
+<section class="hero-card p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-2">Genera Clientes</h1>
+            <p class="mb-0 opacity-75">Pagina para generar clientes de forma rapida dentro del modulo Solar.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'dashboard:unit_solar' %}">Volver</a>
+    </div>
+</section>
+
+<section class="section-card p-4 reveal reveal-delay-1">
+    <h2 class="h5 mb-2">Proxima funcionalidad</h2>
+    <p class="text-muted mb-3">Aqui podras cargar o generar clientes para acelerar el llenado operativo.</p>
+    <a class="btn btn-primary btn-sm" href="{% url 'dashboard:solar_client_residential' %}">
+        Ir a Cliente Residencial
+    </a>
+</section>
+{% endblock %}

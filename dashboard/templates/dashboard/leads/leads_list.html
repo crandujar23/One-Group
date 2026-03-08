@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+{% block title %}CRM Leads Residencial{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<style>
+.leads-hero {
+    background: linear-gradient(120deg, #0f3b66 0%, #0c6b58 100%);
+    color: #fff;
+    border-radius: 1rem;
+}
+.leads-toolbar {
+    border: 1px solid #dbe3ea;
+    border-radius: .75rem;
+    background: #f8fafc;
+}
+#leadsModal .modal-dialog {
+    max-width: min(1100px, 96vw);
+}
+#leadsModal .modal-content {
+    border: 0;
+    border-radius: .5rem;
+    overflow: hidden;
+}
+#leadsModal .modal-header {
+    background: #d8e8f1;
+    border-bottom: 1px solid #c5d6df;
+}
+#leadsModal .modal-title {
+    font-weight: 700;
+    color: #2b465c;
+}
+#leadModalContent {
+    max-height: 78vh;
+    overflow: auto;
+}
+#leadModalContent .nav-tabs .nav-link {
+    color: #d68400;
+    font-weight: 600;
+}
+#leadModalContent .nav-tabs .nav-link.active {
+    color: #d68400;
+    border-color: transparent transparent #d68400 transparent;
+    border-bottom-width: 2px;
+}
+.action-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: .55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d3dde8;
+    background: #fff;
+    color: #3f5570;
+    text-decoration: none;
+    font-size: 1rem;
+    line-height: 1;
+}
+.action-icon:hover { background: #f4f7fb; color: #1f3f62; }
+.action-icon--edit { border-color: #0d6efd; color: #0d6efd; }
+.action-icon--quote { border-color: #ffc107; color: #8a6400; background: #fff8db; }
+.action-icon--assign { border-color: #6c757d; color: #495057; }
+.action-icon--delete { border-color: #dc3545; color: #dc3545; }
+.table-nowrap { white-space: nowrap; }
+.actions-row { display: flex; flex-wrap: nowrap; gap: .25rem; align-items: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="leads-hero p-4 mb-4 reveal">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Cliente Residencial</h1>
+            <p class="mb-0 opacity-75">Operacion rapida de leads residenciales.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-light btn-sm" href="{% url 'dashboard:unit_solar' %}">Volver</a>
+            <button class="btn btn-warning btn-sm js-open-lead-modal" data-url="/apps/crm/leads/create/" data-title="Nuevo Lead">Nuevo Cliente</button>
+        </div>
+    </div>
+</section>
+
+<section class="row g-3 mb-3 reveal reveal-delay-1">
+    <div class="col-6 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Total leads</p><p class="kpi-value" id="kpi-total">{{ kpis.total }}</p></article></div>
+    <div class="col-6 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Con telefono</p><p class="kpi-value" id="kpi-phone">{{ kpis.with_phone }}</p></article></div>
+    <div class="col-6 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Con email</p><p class="kpi-value" id="kpi-email">{{ kpis.with_email }}</p></article></div>
+    <div class="col-6 col-md-3"><article class="kpi-card p-3 h-100"><p class="kpi-label">Contactabilidad</p><p class="kpi-value" id="kpi-contactability">{{ kpis.contactable_pct }}%</p></article></div>
+</section>
+
+<section class="section-card p-3 mb-3 reveal reveal-delay-1">
+    <h2 class="h6 mb-2">Distribucion por estado</h2>
+    <div id="status-distribution" class="d-flex flex-wrap gap-2">
+        {% for label, total in kpis.status_distribution.items %}
+        <span class="badge text-bg-light border">{{ label }}: {{ total }}</span>
+        {% empty %}
+        <span class="text-muted">Sin datos</span>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="leads-toolbar p-3 mb-3 reveal reveal-delay-2">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-status">Estado</label>
+            <select class="form-select form-select-sm" id="filter-status">
+                <option value="">Todos</option>
+                <option value="NEW">Nuevo</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="CONTACTED">Contactado</option>
+                <option value="QUALIFIED">Calificado</option>
+                <option value="CLOSED">Cerrado</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-city">Ciudad</label>
+            <input class="form-control form-control-sm" id="filter-city" type="text" placeholder="Ciudad">
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-source">Origen</label>
+            <input class="form-control form-control-sm" id="filter-source" type="text" placeholder="Origen">
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1" for="filter-search">Busqueda rapida</label>
+            <input class="form-control form-control-sm" id="filter-search" type="search" placeholder="Nombre, telefono, email">
+        </div>
+        <div class="col-12 d-flex justify-content-between align-items-center mt-2">
+            <button type="button" id="btn-reset" class="btn btn-outline-secondary btn-sm">Reset</button>
+            <span class="badge text-bg-primary" id="live-counter">Mostrando 0 registros</span>
+        </div>
+    </div>
+</section>
+
+<section class="section-card p-3 reveal reveal-delay-3">
+    <div class="table-responsive">
+        <table id="leads-table" class="table table-modern table-striped align-middle w-100">
+            <thead>
+            <tr>
+                    <th>Cliente</th>
+                    <th>Telefono</th>
+                    <th>Email</th>
+                    <th>Ciudad</th>
+                    <th>Origen</th>
+                <th>Tipo de Techo</th>
+                <th>Dueno</th>
+                <th>Factura Electrica</th>
+                <th>Tamano Sistema</th>
+                <th>Ver en mapa</th>
+                <th>Estado actual</th>
+                <th>Fecha creacion</th>
+                <th>Acciones</th>
+            </tr>
+            </thead>
+        </table>
+    </div>
+</section>
+
+<div class="modal fade" id="leadsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="leadsModalTitle">Lead</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0" id="leadModalContent"></div>
+        </div>
+    </div>
+</div>
+
+<script id="leads-config" type="application/json">{
+    "apiUrl": "{{ api_url }}",
+    "createUrl": "{% url 'dashboard:crm_lead_create_modal' %}",
+    "fillTableUrl": "{% url 'dashboard:crm_lead_fill_table_modal' %}",
+    "logUrl": "{% url 'dashboard:crm_leads_log_activity' %}",
+    "duplicatePendingUrl": "{% url 'dashboard:crm_duplicate_review_pending' %}",
+    "duplicateActionBase": "{% url 'dashboard:crm_duplicate_review_action' 0 %}",
+    "duplicateRequestUrl": "{% url 'dashboard:crm_duplicate_review_request' %}",
+    "assignBase": "{% url 'dashboard:crm_assign_lead_api' 0 %}",
+    "acceptBase": "{% url 'dashboard:crm_accept_lead_api' 0 %}",
+    "detailBase": "{% url 'dashboard:crm_lead_detail' 0 %}",
+    "editBase": "{% url 'dashboard:crm_lead_update_modal' 0 %}",
+    "deleteBase": "{% url 'dashboard:crm_lead_delete_modal' 0 %}",
+    "quickQuoteUrl": "{% url 'dashboard:quoter_iframe' %}",
+    "csrfToken": "{{ csrf_token }}",
+    "canAssign": {{ can_assign_leads_ui|yesno:'true,false' }},
+    "canDelete": {{ is_superadmin_or_partner|yesno:'true,false' }},
+    "salesreps": {{ salesreps_choices_json|safe }}
+}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function () {
+    const cfg = JSON.parse(document.getElementById('leads-config').textContent || '{}');
+    const leadModalEl = document.getElementById('leadsModal');
+    const leadModalBody = document.getElementById('leadModalContent');
+    const leadModalTitle = document.getElementById('leadsModalTitle');
+    let leadModal = null;
+
+    function ensureLeadModal() {
+        if (leadModal) return leadModal;
+        if (!window.bootstrap || !window.bootstrap.Modal || !leadModalEl) return null;
+        leadModal = new window.bootstrap.Modal(leadModalEl);
+        return leadModal;
+    }
+
+    function renderModalAlert(message) {
+        leadModalBody.innerHTML = '<div class="p-3"><div class="alert alert-danger mb-0">' + (message || 'No fue posible cargar el modal.') + '</div></div>';
+    }
+
+    function injectModalHtml(html) {
+        leadModalBody.innerHTML = html;
+        const scripts = Array.from(leadModalBody.querySelectorAll('script'));
+        scripts.forEach((oldScript) => {
+            const newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+            if (oldScript.textContent) newScript.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+    }
+
+    function openLeadModal(url, title) {
+        if (!url) return;
+        const sep = url.indexOf('?') >= 0 ? '&' : '?';
+        const requestUrl = url + sep + '_modal=1';
+        if (leadModalTitle) leadModalTitle.textContent = title || 'Lead';
+        leadModalBody.innerHTML = '<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>Cargando...</div>';
+        const modal = ensureLeadModal();
+        if (modal) modal.show();
+        fetch(requestUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then((r) => {
+                if (!r.ok) throw new Error('error_http');
+                return r.text();
+            })
+            .then((html) => {
+                if (!html || !html.trim()) {
+                    renderModalAlert('La respuesta del servidor llego vacia.');
+                    return;
+                }
+                injectModalHtml(html);
+            })
+            .catch(() => renderModalAlert('Ocurrio un error cargando el formulario.'));
+    }
+
+    document.addEventListener('click', function (event) {
+        const trigger = event.target.closest('.js-open-lead-modal, #btn-create-lead');
+        if (!trigger) return;
+        event.preventDefault();
+        const url = trigger.getAttribute('data-url') || cfg.createUrl || '/apps/crm/leads/create/';
+        const title = trigger.getAttribute('data-title') || 'Nuevo Lead';
+        openLeadModal(url, title);
+    });
+
+    const $ = window.jQuery;
+    if (!$ || !$.fn.DataTable) return;
+
+    function idUrl(base, id) { return String(base).replace('/0/', '/' + id + '/'); }
+    function post(url, bodyObj) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': cfg.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams(bodyObj || {}).toString()
+        }).then((r) => r.json());
+    }
+
+    function refreshKpis(kpis) {
+        if (!kpis) return;
+        document.getElementById('kpi-total').textContent = kpis.total || 0;
+        document.getElementById('kpi-phone').textContent = kpis.with_phone || 0;
+        document.getElementById('kpi-email').textContent = kpis.with_email || 0;
+        document.getElementById('kpi-contactability').textContent = (kpis.contactable_pct || 0) + '%';
+        const node = document.getElementById('status-distribution');
+        node.innerHTML = '';
+        const entries = Object.entries(kpis.status_distribution || {});
+        if (!entries.length) {
+            node.innerHTML = '<span class="text-muted">Sin datos</span>';
+            return;
+        }
+        entries.forEach(([label, total]) => {
+            const span = document.createElement('span');
+            span.className = 'badge text-bg-light border';
+            span.textContent = label + ': ' + total;
+            node.appendChild(span);
+        });
+    }
+
+    function logActivity(leadId, type, payload) {
+        post(cfg.logUrl, {
+            lead_id: String(leadId),
+            activity_type: type,
+            payload: JSON.stringify(payload || {})
+        });
+    }
+
+    const table = $('#leads-table').DataTable({
+        processing: true,
+        deferRender: true,
+        paging: false,
+        searching: false,
+        info: false,
+        ajax: {
+            url: cfg.apiUrl,
+            dataSrc: function (json) {
+                refreshKpis(json.kpis || {});
+                document.getElementById('live-counter').textContent = 'Mostrando ' + ((json.data || []).length || 0) + ' registros';
+                return json.data || [];
+            },
+            data: function (d) {
+                d.lead_kind = 'residential';
+                d.status = document.getElementById('filter-status').value || '';
+                d.city = document.getElementById('filter-city').value || '';
+                d.source = document.getElementById('filter-source').value || '';
+                d.search = document.getElementById('filter-search').value || '';
+            }
+        },
+        columns: [
+            { data: 'full_name', render: (d) => '<span class="fw-semibold table-nowrap">' + (d || 'Sin dato') + '</span>' },
+            { data: 'phone', render: (d, t, row) => d ? '<a href="tel:' + d + '" class="js-log table-nowrap" data-id="' + row.id + '" data-type="PHONE">' + d + '</a>' : 'Sin dato' },
+            { data: 'email', render: (d, t, row) => d ? '<a href="mailto:' + d + '" class="js-log" data-id="' + row.id + '" data-type="EMAIL">' + d + '</a>' : 'Sin dato' },
+            { data: 'city', render: (d) => d || '—' },
+            { data: 'lead_source_name', render: (d) => d || '—' },
+            { data: 'roof_type', render: (d) => d || '—' },
+            { data: 'owner_name', render: (d) => d || '—' },
+            { data: 'electricity_bill', render: (d) => d ? '$' + Number(d).toLocaleString() : '—' },
+            { data: 'system_size_kw', render: (d) => d ? Number(d).toFixed(2) + ' kW' : '—' },
+            { data: 'map_url', render: (d) => d ? '<a href="' + d + '" target="_blank" rel="noopener">Abrir</a>' : '—' },
+            { data: 'status_display', render: (d) => '<span class="badge text-bg-light border">' + (d || 'Sin estado') + '</span>' },
+            { data: 'created_at' },
+            { data: null, orderable: false, searchable: false, render: function (d, t, row) {
+                const parts = [];
+                parts.push('<button class="action-icon js-open" title="Ver detalle" data-title="Detalle Lead" data-url="' + idUrl(cfg.detailBase, row.id) + '">👁</button>');
+                parts.push('<button class="action-icon action-icon--edit js-open" title="Editar lead" data-title="Editar Lead" data-url="' + idUrl(cfg.editBase, row.id) + '">✏</button>');
+                parts.push('<a class="action-icon action-icon--quote" title="Cotizacion rapida" href="' + cfg.quickQuoteUrl + '">⚡</a>');
+                if (!row.is_accepted && row.acceptance_deadline) {
+                    parts.push('<button class="action-icon js-accept" title="Aceptar lead" data-id="' + row.id + '">✔</button>');
+                }
+                if (cfg.canAssign) {
+                    parts.push('<button class="action-icon action-icon--assign js-assign" title="Asignar lead" data-id="' + row.id + '">👤</button>');
+                    if (Number(row.pending_duplicate_requests || 0) > 0) {
+                        parts.push('<button class="action-icon js-dup" title="Revisar duplicados" data-id="' + row.id + '">🧾</button>');
+                    }
+                }
+                if (cfg.canDelete) {
+                    parts.push('<button class="action-icon action-icon--delete js-open" title="Eliminar lead" data-title="Eliminar Lead" data-url="' + idUrl(cfg.deleteBase, row.id) + '">🗑</button>');
+                }
+                return '<div class="actions-row">' + parts.join('') + '</div>';
+            }}
+        ],
+        language: {
+            processing: 'Cargando...',
+            zeroRecords: 'No se encontraron resultados'
+        }
+    });
+
+    function reload() { table.ajax.reload(null, false); }
+
+    document.getElementById('filter-status').addEventListener('change', reload);
+    document.getElementById('filter-city').addEventListener('input', reload);
+    document.getElementById('filter-source').addEventListener('input', reload);
+    document.getElementById('filter-search').addEventListener('input', reload);
+    document.getElementById('btn-reset').addEventListener('click', function () {
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-city').value = '';
+        document.getElementById('filter-source').value = '';
+        document.getElementById('filter-search').value = '';
+        reload();
+    });
+
+    document.addEventListener('click', function (event) {
+        const logLink = event.target.closest('.js-log');
+        if (logLink) {
+            logActivity(logLink.getAttribute('data-id'), logLink.getAttribute('data-type'), {});
+        }
+
+        const openBtn = event.target.closest('.js-open');
+        if (openBtn) {
+            openLeadModal(openBtn.getAttribute('data-url'), openBtn.getAttribute('data-title') || 'Lead');
+            return;
+        }
+
+        const acceptBtn = event.target.closest('.js-accept');
+        if (acceptBtn) {
+            post(idUrl(cfg.acceptBase, acceptBtn.getAttribute('data-id')), {}).then(() => reload());
+            return;
+        }
+
+        const assignBtn = event.target.closest('.js-assign');
+        if (assignBtn) {
+            const id = assignBtn.getAttribute('data-id');
+            const options = (cfg.salesreps || []).map((item) => item.id + ':' + item.label).join('\n');
+            const selected = window.prompt('ID de asociado destino:\n' + options);
+            if (!selected) return;
+            post(idUrl(cfg.assignBase, id), { salesrep_id: selected }).then(() => reload());
+            return;
+        }
+
+        const dupBtn = event.target.closest('.js-dup');
+        if (dupBtn) {
+            const id = dupBtn.getAttribute('data-id');
+            fetch(cfg.duplicatePendingUrl + '?lead_id=' + id)
+                .then((r) => r.json())
+                .then((payload) => {
+                    const first = (payload.data || [])[0];
+                    if (!first) { alert('No hay solicitudes pendientes.'); return; }
+                    const approve = window.confirm('Solicitud de ' + first.requester_name + '\n\nAceptar?');
+                    post(idUrl(cfg.duplicateActionBase, first.id), { action: approve ? 'approve' : 'reject', notes: '' }).then(() => reload());
+                });
+        }
+    });
+
+    leadModalEl.addEventListener('submit', function (event) {
+        const form = event.target.closest('form.js-lead-modal-form');
+        if (!form) return;
+        event.preventDefault();
+
+        const data = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: data,
+            headers: { 'X-CSRFToken': cfg.csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(async (r) => {
+            const contentType = r.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) return { status: r.status, payload: await r.json() };
+            return { status: r.status, payload: { success: false, html: await r.text() } };
+        })
+        .then(({ status, payload }) => {
+            if (payload.success) {
+                const modal = ensureLeadModal();
+                if (modal) modal.hide();
+                reload();
+                return;
+            }
+            if (status === 409 && payload.can_request_review && payload.duplicate && payload.duplicate.duplicate_lead_id) {
+                if (window.confirm((payload.message || 'Duplicado detectado') + '\n\nSolicitar revision al Partner?')) {
+                    post(cfg.duplicateRequestUrl, {
+                        lead_id: String(payload.duplicate.duplicate_lead_id),
+                        reason: payload.duplicate.duplicate_by || 'Duplicado detectado'
+                    });
+                }
+                return;
+            }
+            if (payload.html) {
+                injectModalHtml(payload.html);
+                return;
+            }
+            alert(payload.message || 'No fue posible completar la accion');
+        });
+    });
+})();
+</script>
+{% endblock %}

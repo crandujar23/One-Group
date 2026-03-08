@@ -2,6 +2,7 @@
 {% block title %}Cotizador{% endblock %}
 {% block content %}
 <section class="hero-card p-4 mb-4 reveal">
+    <a class="btn btn-light btn-sm mb-3" href="{% url 'dashboard:unit_solar' %}" onclick="if (window.history.length > 1) { event.preventDefault(); window.history.back(); }">Volver</a>
     <h1 class="h3 mb-2">Cotizador</h1>
     <p class="mb-0 opacity-75">Vista embebida del cotizador de Solar Home Power.</p>
 </section>
